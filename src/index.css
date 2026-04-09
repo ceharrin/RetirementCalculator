@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --color-surface: #f8f7fa;
+  --color-surface-dark: #1a1b22;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: #1a1b22;
+    --color-surface-dark: #0f1014;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+/* Align numeric values with grid columns; native spinners clip wide values (e.g. $30,000). */
+@layer utilities {
+  .input-number-clean {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .input-number-clean::-webkit-inner-spin-button,
+  .input-number-clean::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
