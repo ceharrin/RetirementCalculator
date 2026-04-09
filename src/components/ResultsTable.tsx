@@ -18,25 +18,25 @@ export function ResultsTable({ rows }: ResultsTableProps) {
       <table className="min-w-full divide-y divide-indigo-100 text-sm dark:divide-indigo-900/40">
         <thead className="bg-indigo-50/95 dark:bg-indigo-950/45">
           <tr>
-            <th scope="col" className="px-3 py-3 text-left font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Year
             </th>
-            <th scope="col" className="px-3 py-3 text-left font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Retiree age
             </th>
-            <th scope="col" className="px-3 py-3 text-left font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Spouse age
             </th>
-            <th scope="col" className="px-3 py-3 text-right font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Expenses
             </th>
-            <th scope="col" className="px-3 py-3 text-right font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Social Security
             </th>
-            <th scope="col" className="px-3 py-3 text-right font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Portfolio withdrawal
             </th>
-            <th scope="col" className="px-3 py-3 text-right font-bold text-indigo-950 dark:text-indigo-100">
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               End balance
             </th>
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">

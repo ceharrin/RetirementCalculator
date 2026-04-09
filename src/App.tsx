@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { BalanceChart } from './components/BalanceChart'
 import { InputForm } from './components/InputForm'
+import { PrintAssumptionsTable } from './components/PrintAssumptionsTable'
 import { ResultsTable } from './components/ResultsTable'
 import {
   clampSsClaimAge,
@@ -17,6 +19,7 @@ import {
 import { defaultFormState, formStateToSimulationInput, type FormState } from './types/form'
 
 const PLANNING_YEAR = new Date().getFullYear()
+const initialForm = defaultFormState(PLANNING_YEAR)
 
 function applyHistoricalDefaults(prev: FormState): FormState {
   return {
@@ -31,8 +34,25 @@ function applyHistoricalDefaults(prev: FormState): FormState {
   }
 }
 
+function formatReportDate(d: Date): string {
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
 export default function App() {
-  const [form, setForm] = useState<FormState>(() => defaultFormState(PLANNING_YEAR))
+  const [form, setForm] = useState<FormState>(() => initialForm)
+  const [assumptionsForReport, setAssumptionsForReport] = useState<FormState | null>(() => {
+    const input = formStateToSimulationInput(initialForm)
+    return validateSimulationInput(input).length === 0 ? { ...initialForm } : null
+  })
+  const [printReportMeta, setPrintReportMeta] = useState<{
+    display: string
+    iso: string
+  } | null>(null)
 
   const applyFormPatch = useCallback((patch: Partial<FormState>) => {
     setForm((f) => {
@@ -47,7 +67,7 @@ export default function App() {
     })
   }, [])
   const [result, setResult] = useState<SimulationResult | null>(() => {
-    const input = formStateToSimulationInput(defaultFormState(PLANNING_YEAR))
+    const input = formStateToSimulationInput(initialForm)
     return validateSimulationInput(input).length === 0
       ? simulateRetirement(input)
       : null
@@ -62,17 +82,30 @@ export default function App() {
 
   const runProjection = useCallback(() => {
     if (!canRun) return
+    setAssumptionsForReport({ ...form })
     setResult(simulateRetirement(simulationInput))
-  }, [canRun, simulationInput])
+  }, [canRun, form, simulationInput])
+
+  const printOrSavePdf = useCallback(() => {
+    if (!result) return
+    const now = new Date()
+    flushSync(() => {
+      setPrintReportMeta({
+        display: formatReportDate(now),
+        iso: now.toISOString().slice(0, 10),
+      })
+    })
+    window.print()
+  }, [result])
 
   return (
     <div className="min-h-svh bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-50/45 text-slate-900 dark:from-slate-950 dark:via-indigo-950/30 dark:to-violet-950/25 dark:text-slate-50">
-      <header className="border-b border-indigo-200/80 bg-white/90 px-4 py-8 shadow-sm shadow-indigo-100/50 backdrop-blur dark:border-indigo-800/40 dark:bg-slate-900/90 dark:shadow-indigo-950/20">
+      <header className="border-b border-indigo-200/80 bg-white/90 px-4 py-8 shadow-sm shadow-indigo-100/50 backdrop-blur dark:border-indigo-800/40 dark:bg-slate-900/90 dark:shadow-indigo-950/20 print:border-slate-300 print:bg-white print:py-4 print:shadow-none dark:print:bg-white">
         <div className="mx-auto max-w-6xl text-center sm:text-left">
-          <h1 className="bg-gradient-to-r from-indigo-800 to-violet-700 bg-clip-text text-3xl font-semibold tracking-tight text-transparent dark:from-indigo-300 dark:to-violet-300 sm:text-4xl">
+          <h1 className="bg-gradient-to-r from-indigo-800 to-violet-700 bg-clip-text text-3xl font-semibold tracking-tight text-transparent dark:from-indigo-300 dark:to-violet-300 sm:text-4xl print:bg-none print:bg-clip-border print:text-slate-900">
             Retirement planning calculator
           </h1>
-          <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-400">
+          <p className="mt-2 max-w-3xl text-slate-600 no-print dark:text-slate-400">
             Year-by-year portfolio projection using your retirement age, spending, inflation, return
             assumptions, and simplified Social Security. For couples, spending and benefits adjust
             after the first death using the rules you set below.
@@ -80,9 +113,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="grid gap-10 lg:grid-cols-5">
-          <div className="lg:col-span-2">
+      <main className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:px-2 print:py-4">
+        <div className="grid gap-10 lg:grid-cols-5 print:block">
+          <div className="no-print lg:col-span-2">
             <InputForm
               form={form}
               onChange={applyFormPatch}
@@ -108,23 +141,45 @@ export default function App() {
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 print:w-full print:max-w-none">
             {result ? (
-              <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-8 print:gap-6">
+                <div className="print-only mb-4 border-b border-slate-300 pb-3">
+                  <p className="text-lg font-semibold text-slate-900">Retirement projection report</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Generated{' '}
+                    {printReportMeta ? (
+                      <time dateTime={printReportMeta.iso}>{printReportMeta.display}</time>
+                    ) : null}
+                  </p>
+                </div>
+                <PrintAssumptionsTable form={assumptionsForReport ?? form} />
+                <div className="no-print">
+                  <button
+                    type="button"
+                    onClick={printOrSavePdf}
+                    className="mb-2 rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:border-indigo-600 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-indigo-950/50 dark:focus:ring-offset-slate-950"
+                  >
+                    Print or save as PDF
+                  </button>
+                  <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+                    Opens your browser print dialog—choose &quot;Save as PDF&quot; to download.
+                  </p>
+                </div>
                 <section>
-                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100">
+                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Portfolio and withdrawals
                   </h2>
                   <BalanceChart rows={result.rows} />
                 </section>
                 <section>
-                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100">
+                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Year-by-year detail
                   </h2>
                   <ResultsTable rows={result.rows} />
                 </section>
                 <aside
-                  className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100"
+                  className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100 print:border-slate-300 print:bg-slate-50 print:text-slate-800 dark:print:bg-slate-50 dark:print:text-slate-800"
                   role="note"
                 >
                   <strong className="font-semibold">Disclaimer.</strong> This tool is for education

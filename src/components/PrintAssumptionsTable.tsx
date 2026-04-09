@@ -1,0 +1,110 @@
+import type { ReactNode } from 'react'
+import type { FormState } from '../types/form'
+
+function formatMoney(n: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n)
+}
+
+function formatPercentWhole(n: number): string {
+  return Number.isInteger(n) ? `${n}%` : `${Number(n.toFixed(2))}%`
+}
+
+function sectionHeader(label: string) {
+  return (
+    <tr key={label}>
+      <th
+        colSpan={2}
+        scope="colgroup"
+        className="border-b border-slate-400 bg-slate-100 px-2 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-800"
+      >
+        {label}
+      </th>
+    </tr>
+  )
+}
+
+function assumptionRow(label: string, value: string) {
+  return (
+    <tr key={label} className="border-b border-slate-200">
+      <td className="px-2 py-1.5 text-left text-sm text-slate-700">{label}</td>
+      <td className="px-2 py-1.5 text-right text-sm font-medium tabular-nums text-slate-900">
+        {value}
+      </td>
+    </tr>
+  )
+}
+
+export function PrintAssumptionsTable(props: { form: FormState }) {
+  const { form } = props
+
+  const survivorSsLabel =
+    form.survivorSSMode === 'higherOfTwo'
+      ? 'Higher of two benefits'
+      : 'Custom annual benefit'
+
+  const rows: ReactNode[] = []
+
+  rows.push(sectionHeader('Household & longevity'))
+  rows.push(assumptionRow('Planning start year', String(form.startYear)))
+  rows.push(assumptionRow('Retiree current age', String(form.retireeCurrentAge)))
+  rows.push(assumptionRow('Include spouse', form.hasSpouse ? 'Yes' : 'No'))
+  if (form.hasSpouse) {
+    rows.push(assumptionRow('Spouse current age', String(form.spouseCurrentAge)))
+  }
+  rows.push(assumptionRow('Retiree age at death', String(form.retireeDeathAge)))
+  if (form.hasSpouse) {
+    rows.push(assumptionRow('Spouse age at death', String(form.spouseDeathAge)))
+  }
+
+  rows.push(sectionHeader('Retirement spending & portfolio'))
+  rows.push(assumptionRow('Retiree retirement age', String(form.retireeRetirementAge)))
+  rows.push(assumptionRow('Annual retirement expenses', formatMoney(form.annualExpenseAtRetirementStart)))
+  rows.push(
+    assumptionRow('Real spending decline starts (age)', String(form.spendingDeclineStartAge)),
+  )
+  rows.push(
+    assumptionRow('Annual real spending decline', formatPercentWhole(form.spendingDeclinePercent)),
+  )
+  rows.push(assumptionRow('Current retirement savings', formatMoney(form.currentSavings)))
+  rows.push(
+    assumptionRow('Annual portfolio return', formatPercentWhole(form.portfolioReturnPercent)),
+  )
+  rows.push(assumptionRow('Annual inflation', formatPercentWhole(form.inflationPercent)))
+
+  rows.push(sectionHeader('Social Security'))
+  rows.push(
+    assumptionRow('Annual SS COLA', formatPercentWhole(form.socialSecurityColaPercent)),
+  )
+  rows.push(assumptionRow('Retiree claim age', String(form.retireeClaimAge)))
+  rows.push(assumptionRow('Retiree annual benefit', formatMoney(form.retireeAnnualSS)))
+  if (form.hasSpouse) {
+    rows.push(assumptionRow('Spouse claim age', String(form.spouseClaimAge)))
+    rows.push(assumptionRow('Spouse annual benefit', formatMoney(form.spouseAnnualSS)))
+  }
+
+  if (form.hasSpouse) {
+    rows.push(sectionHeader('After first death'))
+    rows.push(
+      assumptionRow('Survivor expenses (% of joint)', formatPercentWhole(form.survivorExpensePercent)),
+    )
+    rows.push(assumptionRow('Survivor Social Security', survivorSsLabel))
+    if (form.survivorSSMode === 'custom') {
+      rows.push(
+        assumptionRow('Custom survivor benefit', formatMoney(form.customSurvivorAnnualSS)),
+      )
+    }
+  }
+
+  return (
+    <div className="print-only mb-5">
+      <h3 className="mb-2 text-sm font-bold text-slate-900">Assumed values</h3>
+      <table className="w-full border-collapse border border-slate-300 text-sm">
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+  )
+}
