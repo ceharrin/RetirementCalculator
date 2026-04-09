@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { FormState } from '../types/form'
 import type { ValidationIssue } from '../lib/simulateRetirement'
 import {
@@ -35,6 +36,85 @@ const labelSlotClass =
 const hintSlotClass = 'min-h-9 space-y-0.5 text-[11px] leading-snug'
 const inputClass =
   'input-number-clean box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-2 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 disabled:opacity-50 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100'
+
+function formatMoneyInteger(n: number): string {
+  if (!Number.isFinite(n)) return ''
+  return Math.trunc(n).toLocaleString(undefined, { maximumFractionDigits: 0 })
+}
+
+function parseDigitsToInteger(s: string): number {
+  const digits = s.replace(/\D/g, '')
+  if (digits === '') return 0
+  const n = Number(digits)
+  return Number.isFinite(n) ? Math.trunc(n) : 0
+}
+
+function clampInteger(n: number, min?: number, max?: number): number {
+  let x = Math.trunc(n)
+  if (min !== undefined) x = Math.max(min, x)
+  if (max !== undefined) x = Math.min(max, x)
+  return x
+}
+
+function MoneyField(props: {
+  id: string
+  label: string
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+  hint?: string
+  error?: string
+  disabled?: boolean
+}) {
+  const { id, label, value, onChange, min, max, hint, error, disabled } = props
+  const describedBy = [hint ? `${id}-hint` : '', error ? `${id}-err` : '']
+    .filter(Boolean)
+    .join(' ') || undefined
+
+  const [editingText, setEditingText] = useState<string | null>(null)
+  const displayValue = editingText !== null ? editingText : formatMoneyInteger(value)
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-1 text-left">
+      <div className={labelSlotClass}>
+        <label htmlFor={id} className="block w-full">
+          {label}
+        </label>
+      </div>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        disabled={disabled}
+        value={displayValue}
+        onFocus={() => setEditingText(formatMoneyInteger(value))}
+        onChange={(e) => {
+          const s = e.target.value
+          setEditingText(s)
+          onChange(clampInteger(parseDigitsToInteger(s), min, max))
+        }}
+        onBlur={() => setEditingText(null)}
+        className={inputClass}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+      />
+      <div className={hintSlotClass}>
+        {hint ? (
+          <p id={`${id}-hint`} className="text-slate-500 dark:text-slate-400">
+            {hint}
+          </p>
+        ) : null}
+        {error ? (
+          <p id={`${id}-err`} className="text-red-600 dark:text-red-400" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 function NumField(props: {
   id: string
@@ -151,7 +231,10 @@ export function InputForm({
           <h2 className="text-base font-bold text-indigo-900 dark:text-indigo-100">Assumptions</h2>
           <button
             type="button"
-            onClick={onApplyHistoricalDefaults}
+            onClick={() => {
+              ;(document.activeElement as HTMLElement | null)?.blur?.()
+              onApplyHistoricalDefaults()
+            }}
             className="shrink-0 rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
           >
             Apply historical defaults
@@ -254,13 +337,12 @@ export function InputForm({
               error={fieldError(validationIssues, 'retireeRetirementAge')}
               hint="Withdrawals for living expenses start this year."
             />
-            <NumField
+            <MoneyField
               id="annualExpenseAtRetirementStart"
               label="Annual retirement expenses ($)"
               value={form.annualExpenseAtRetirementStart}
               onChange={(n) => set('annualExpenseAtRetirementStart', n)}
               min={0}
-              step={1000}
               error={fieldError(validationIssues, 'annualExpenseAtRetirementStart')}
               hint="Inflation applies each year; real decline can apply from the age below."
             />
@@ -285,13 +367,12 @@ export function InputForm({
               error={fieldError(validationIssues, 'spendingDeclineAnnualRate')}
               hint={`After start age, ~${(DEFAULT_SPENDING_DECLINE_ANNUAL_RATE * 100).toFixed(0)}%/yr matches common research; 0% = off.`}
             />
-            <NumField
+            <MoneyField
               id="currentSavings"
               label="Current retirement savings ($)"
               value={form.currentSavings}
               onChange={(n) => set('currentSavings', n)}
               min={0}
-              step={1000}
               error={fieldError(validationIssues, 'currentSavings')}
             />
             <NumField
@@ -345,13 +426,12 @@ export function InputForm({
               onChange={(n) => set('retireeClaimAge', n)}
               error={fieldError(validationIssues, 'retireeClaimAge')}
             />
-            <NumField
+            <MoneyField
               id="retireeAnnualSS"
               label="Retiree annual benefit ($)"
               value={form.retireeAnnualSS}
               onChange={(n) => set('retireeAnnualSS', n)}
               min={0}
-              step={500}
               error={fieldError(validationIssues, 'socialSecurity')}
             />
             {form.hasSpouse ? (
@@ -363,13 +443,12 @@ export function InputForm({
                   onChange={(n) => set('spouseClaimAge', n)}
                   error={fieldError(validationIssues, 'spouseClaimAge')}
                 />
-                <NumField
+                <MoneyField
                   id="spouseAnnualSS"
                   label="Spouse annual benefit ($)"
                   value={form.spouseAnnualSS}
                   onChange={(n) => set('spouseAnnualSS', n)}
                   min={0}
-                  step={500}
                 />
               </>
             ) : null}
@@ -418,13 +497,12 @@ export function InputForm({
                 </div>
                 {form.survivorSSMode === 'custom' ? (
                   <div className="mt-2 max-w-md">
-                    <NumField
+                    <MoneyField
                       id="customSurvivorAnnualSS"
                       label="Custom survivor benefit ($)"
                       value={form.customSurvivorAnnualSS}
                       onChange={(n) => set('customSurvivorAnnualSS', n)}
                       min={0}
-                      step={500}
                       error={fieldError(validationIssues, 'customSurvivorAnnualSS')}
                     />
                   </div>
