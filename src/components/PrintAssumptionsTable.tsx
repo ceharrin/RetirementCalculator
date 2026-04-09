@@ -50,6 +50,14 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
 
   rows.push(sectionHeader('Household & longevity'))
   rows.push(assumptionRow('Planning start year', String(form.startYear)))
+  rows.push(
+    assumptionRow(
+      'Projection timing',
+      form.projectionCadence === 'monthly'
+        ? 'Monthly (12 steps per year)'
+        : 'Annual (one step per year)',
+    ),
+  )
   rows.push(assumptionRow('Retiree current age', String(form.retireeCurrentAge)))
   rows.push(assumptionRow('Include spouse', form.hasSpouse ? 'Yes' : 'No'))
   if (form.hasSpouse) {

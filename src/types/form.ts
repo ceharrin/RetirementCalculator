@@ -3,6 +3,7 @@ import {
   DEFAULT_SPENDING_DECLINE_ANNUAL_RATE,
   DEFAULT_SPENDING_DECLINE_START_AGE,
   DEFAULT_SS_COLA_RATE,
+  type ProjectionCadence,
   type SimulationInput,
   type SurvivorSSMode,
 } from '../lib/simulateRetirement'
@@ -33,6 +34,8 @@ export interface FormState {
   survivorExpensePercent: number
   survivorSSMode: SurvivorSSMode
   customSurvivorAnnualSS: number
+  /** One portfolio step per year vs twelve within each year. */
+  projectionCadence: ProjectionCadence
 }
 
 export function defaultFormState(nowYear: number): FormState {
@@ -58,6 +61,7 @@ export function defaultFormState(nowYear: number): FormState {
     survivorExpensePercent: 75,
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: 30_000,
+    projectionCadence: 'annual',
   }
 }
 
@@ -85,5 +89,6 @@ export function formStateToSimulationInput(form: FormState): SimulationInput {
     survivorSSMode: form.survivorSSMode,
     customSurvivorAnnualSS:
       form.survivorSSMode === 'custom' ? form.customSurvivorAnnualSS : null,
+    projectionCadence: form.projectionCadence,
   }
 }

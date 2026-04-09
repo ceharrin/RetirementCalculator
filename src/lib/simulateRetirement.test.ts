@@ -29,6 +29,7 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     socialSecurityColaRate: 0,
     spendingDeclineStartAge: 100,
     spendingDeclineAnnualRate: 0,
+    projectionCadence: 'annual',
     ...over,
   }
 }
@@ -244,5 +245,44 @@ describe('simulateRetirement', () => {
     expect(at70?.annualExpense).toBeCloseTo(110_000, 5)
     const nominal71 = 100_000 * 1.1 ** 2
     expect(at71?.annualExpense).toBeCloseTo(nominal71 * 0.95, 5)
+  })
+
+  it('monthly cadence uses 12 steps and matches annual when return and SS are zero', () => {
+    const input = baseInput({
+      retireeCurrentAge: 65,
+      retireeRetirementAge: 65,
+      retireeDeathAge: 70,
+      annualExpenseAtRetirementStart: 60_000,
+      currentSavings: 200_000,
+      portfolioReturn: 0,
+      inflationRate: 0,
+    })
+    const annualRows = simulateRetirement({ ...input, projectionCadence: 'annual' }).rows
+    const monthlyRows = simulateRetirement({ ...input, projectionCadence: 'monthly' }).rows
+    expect(monthlyRows.length).toBe(annualRows.length)
+    for (let i = 0; i < annualRows.length; i++) {
+      expect(monthlyRows[i].portfolioWithdrawal).toBeCloseTo(annualRows[i].portfolioWithdrawal, 5)
+      expect(monthlyRows[i].endPortfolioBalance).toBeCloseTo(annualRows[i].endPortfolioBalance, 5)
+      expect(monthlyRows[i].annualExpense).toBe(annualRows[i].annualExpense)
+    }
+  })
+
+  it('monthly cadence produces finite rows with positive return', () => {
+    const { rows } = simulateRetirement(
+      baseInput({
+        projectionCadence: 'monthly',
+        retireeCurrentAge: 65,
+        retireeRetirementAge: 65,
+        retireeDeathAge: 80,
+        annualExpenseAtRetirementStart: 40_000,
+        currentSavings: 800_000,
+        portfolioReturn: 0.06,
+        inflationRate: 0.03,
+        retireeClaimAge: 65,
+        retireeAnnualSS: 15_000,
+      }),
+    )
+    expect(rows.every((r) => Number.isFinite(r.endPortfolioBalance))).toBe(true)
+    expect(rows.some((r) => r.portfolioWithdrawal > 0)).toBe(true)
   })
 })

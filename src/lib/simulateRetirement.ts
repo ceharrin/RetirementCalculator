@@ -40,6 +40,18 @@ export function clampSsClaimAge(age: number): number {
 
 export type SurvivorSSMode = 'higherOfTwo' | 'custom'
 
+/** One portfolio step per year vs twelve (monthly return and cash flows within the year). */
+export type ProjectionCadence = 'annual' | 'monthly'
+
+/**
+ * Equivalent per-month rate so twelve compound steps match one annual step:
+ * `(1 + r_m)^12 = 1 + r_annual`.
+ */
+export function monthlyRateFromAnnual(annualDecimal: number): number {
+  if (!Number.isFinite(annualDecimal)) return 0
+  return (1 + annualDecimal) ** (1 / 12) - 1
+}
+
 export interface SimulationInput {
   /** Calendar year for the first projection row (retiree’s current age applies this year). */
   startYear: number
@@ -76,6 +88,7 @@ export interface SimulationInput {
   spendingDeclineStartAge: number
   /** Annual real decline as decimal (e.g. 0.01 = 1%/yr) for each year at/above start age. */
   spendingDeclineAnnualRate: number
+  projectionCadence: ProjectionCadence
 }
 
 export interface YearProjection {
@@ -194,6 +207,95 @@ function computeHouseholdSS(
   return 0
 }
 
+interface YearCashFlowResult {
+  endPortfolioBalance: number
+  portfolioWithdrawal: number
+  /** Reported annual expense (retirement years only; matches annual-cadence semantics). */
+  annualExpenseReported: number
+  shortfall: boolean
+}
+
+function applyAnnualYearStep(
+  balance: number,
+  annualExpense: number,
+  socialSecurity: number,
+  inRetirementPhase: boolean,
+  householdAlive: boolean,
+  portfolioReturn: number,
+): YearCashFlowResult {
+  const afterReturn = balance * (1 + portfolioReturn)
+  if (inRetirementPhase && householdAlive) {
+    let withdrawal = Math.max(0, annualExpense - socialSecurity)
+    let shortfall = false
+    if (withdrawal > afterReturn) {
+      shortfall = true
+      withdrawal = afterReturn
+    }
+    return {
+      endPortfolioBalance: Math.max(0, afterReturn - withdrawal),
+      portfolioWithdrawal: withdrawal,
+      annualExpenseReported: annualExpense,
+      shortfall,
+    }
+  }
+  return {
+    endPortfolioBalance: Math.max(0, afterReturn + socialSecurity),
+    portfolioWithdrawal: 0,
+    annualExpenseReported: 0,
+    shortfall: false,
+  }
+}
+
+/**
+ * Twelve substeps: geometric monthly return; retirement spending and SS split evenly by month.
+ */
+function applyMonthlyYearStep(
+  balance: number,
+  annualExpense: number,
+  socialSecurity: number,
+  inRetirementPhase: boolean,
+  householdAlive: boolean,
+  portfolioReturn: number,
+): YearCashFlowResult {
+  const rM = monthlyRateFromAnnual(portfolioReturn)
+  let bal = balance
+  let totalWithdrawal = 0
+  let shortfall = false
+
+  if (inRetirementPhase && householdAlive) {
+    const monthlyExpense = annualExpense / 12
+    const monthlySs = socialSecurity / 12
+    for (let m = 0; m < 12; m++) {
+      const afterReturn = bal * (1 + rM)
+      let withdrawal = Math.max(0, monthlyExpense - monthlySs)
+      if (withdrawal > afterReturn) {
+        shortfall = true
+        withdrawal = afterReturn
+      }
+      bal = Math.max(0, afterReturn - withdrawal)
+      totalWithdrawal += withdrawal
+    }
+    return {
+      endPortfolioBalance: bal,
+      portfolioWithdrawal: totalWithdrawal,
+      annualExpenseReported: annualExpense,
+      shortfall,
+    }
+  }
+
+  const monthlySs = socialSecurity / 12
+  for (let m = 0; m < 12; m++) {
+    bal = bal * (1 + rM)
+    bal = Math.max(0, bal + monthlySs)
+  }
+  return {
+    endPortfolioBalance: bal,
+    portfolioWithdrawal: 0,
+    annualExpenseReported: 0,
+    shortfall: false,
+  }
+}
+
 export function validateSimulationInput(
   input: SimulationInput,
 ): ValidationIssue[] {
@@ -201,6 +303,13 @@ export function validateSimulationInput(
 
   if (input.startYear < 1900 || input.startYear > 2200) {
     issues.push({ field: 'startYear', message: 'Use a reasonable planning start year.' })
+  }
+
+  if (input.projectionCadence !== 'annual' && input.projectionCadence !== 'monthly') {
+    issues.push({
+      field: 'projectionCadence',
+      message: 'Projection timing must be annual or monthly.',
+    })
   }
 
   if (input.retireeCurrentAge < 18 || input.retireeCurrentAge > 120) {
@@ -438,21 +547,26 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       input,
     )
 
-    const afterReturn = balance * (1 + r)
-    let withdrawal = 0
-    let shortfall = false
-    let endPortfolioBalance: number
-
-    if (inRetirementPhase && (retireeAlive || spouseAlive)) {
-      withdrawal = Math.max(0, annualExpense - socialSecurity)
-      if (withdrawal > afterReturn) {
-        shortfall = true
-        withdrawal = afterReturn
-      }
-      endPortfolioBalance = Math.max(0, afterReturn - withdrawal)
-    } else {
-      endPortfolioBalance = Math.max(0, afterReturn + socialSecurity)
-    }
+    const householdAlive = retireeAlive || spouseAlive
+    const cadence = input.projectionCadence
+    const flow =
+      cadence === 'monthly'
+        ? applyMonthlyYearStep(
+            balance,
+            annualExpense,
+            socialSecurity,
+            inRetirementPhase,
+            householdAlive,
+            r,
+          )
+        : applyAnnualYearStep(
+            balance,
+            annualExpense,
+            socialSecurity,
+            inRetirementPhase,
+            householdAlive,
+            r,
+          )
 
     rows.push({
       calendarYear: y,
@@ -462,14 +576,14 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       spouseAlive,
       inRetirementPhase,
       yearsSinceRetirement,
-      annualExpense,
+      annualExpense: flow.annualExpenseReported,
       socialSecurity,
-      portfolioWithdrawal: withdrawal,
-      endPortfolioBalance,
-      shortfall,
+      portfolioWithdrawal: flow.portfolioWithdrawal,
+      endPortfolioBalance: flow.endPortfolioBalance,
+      shortfall: flow.shortfall,
     })
 
-    balance = endPortfolioBalance
+    balance = flow.endPortfolioBalance
   }
 
   return { rows, retirementStartYear }

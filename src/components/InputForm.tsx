@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormState } from '../types/form'
 import type { ValidationIssue } from '../lib/simulateRetirement'
+import { parseMoneyInputToDollars } from '../lib/parseMoneyInput'
 import {
   DEFAULT_INFLATION_RATE,
   DEFAULT_PORTFOLIO_RETURN,
@@ -40,13 +41,6 @@ const inputClass =
 function formatMoneyInteger(n: number): string {
   if (!Number.isFinite(n)) return ''
   return Math.trunc(n).toLocaleString(undefined, { maximumFractionDigits: 0 })
-}
-
-function parseDigitsToInteger(s: string): number {
-  const digits = s.replace(/\D/g, '')
-  if (digits === '') return 0
-  const n = Number(digits)
-  return Number.isFinite(n) ? Math.trunc(n) : 0
 }
 
 function clampInteger(n: number, min?: number, max?: number): number {
@@ -93,7 +87,7 @@ function MoneyField(props: {
         onChange={(e) => {
           const s = e.target.value
           setEditingText(s)
-          onChange(clampInteger(parseDigitsToInteger(s), min, max))
+          onChange(clampInteger(parseMoneyInputToDollars(s), min, max))
         }}
         onBlur={() => setEditingText(null)}
         className={inputClass}
@@ -257,6 +251,41 @@ export function InputForm({
               error={fieldError(validationIssues, 'startYear')}
               hint="First projection row uses this calendar year."
             />
+            <div className="sm:col-span-2 lg:col-span-3">
+              <div className={labelSlotClass}>
+                <span className="block w-full">Projection timing</span>
+              </div>
+              <fieldset className="flex min-h-9 flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
+                <legend className="sr-only">Projection timing</legend>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <input
+                    type="radio"
+                    name="projectionCadence"
+                    checked={form.projectionCadence === 'annual'}
+                    onChange={() => set('projectionCadence', 'annual')}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Annual
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <input
+                    type="radio"
+                    name="projectionCadence"
+                    checked={form.projectionCadence === 'monthly'}
+                    onChange={() => set('projectionCadence', 'monthly')}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Monthly
+                </label>
+              </fieldset>
+              <div className={hintSlotClass}>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Annual: one portfolio return and withdrawal per year. Monthly: twelve substeps using
+                  (1 + annual return)<sup>1/12</sup> − 1 per month; spending and Social Security are
+                  spread evenly within each year.
+                </p>
+              </div>
+            </div>
             <NumField
               id="retireeCurrentAge"
               label="Retiree current age"
