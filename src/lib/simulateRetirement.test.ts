@@ -27,6 +27,7 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: null,
     socialSecurityColaRate: 0,
+    modelSsBenefitCutFrom2032: false,
     spendingDeclineStartAge: 100,
     spendingDeclineAnnualRate: 0,
     projectionCadence: 'annual',
@@ -186,6 +187,32 @@ describe('simulateRetirement', () => {
     const y1 = rows.find((r) => r.retireeAge === 67)
     expect(y0?.socialSecurity).toBe(10_000)
     expect(y1?.socialSecurity).toBe(10_500)
+  })
+
+  it('reduces modeled Social Security by 23% from calendar year 2032 when option is on', () => {
+    const common = {
+      startYear: 2030,
+      retireeCurrentAge: 65,
+      retireeRetirementAge: 65,
+      retireeDeathAge: 70,
+      retireeClaimAge: 65,
+      retireeAnnualSS: 10_000,
+      annualExpenseAtRetirementStart: 0,
+      currentSavings: 100_000,
+      portfolioReturn: 0,
+      inflationRate: 0,
+      socialSecurityColaRate: 0,
+    }
+    const { rows: off } = simulateRetirement(baseInput({ ...common, modelSsBenefitCutFrom2032: false }))
+    const { rows: on } = simulateRetirement(baseInput({ ...common, modelSsBenefitCutFrom2032: true }))
+    const y2031Off = off.find((r) => r.calendarYear === 2031)
+    const y2032Off = off.find((r) => r.calendarYear === 2032)
+    const y2031On = on.find((r) => r.calendarYear === 2031)
+    const y2032On = on.find((r) => r.calendarYear === 2032)
+    expect(y2031Off?.socialSecurity).toBe(10_000)
+    expect(y2032Off?.socialSecurity).toBe(10_000)
+    expect(y2031On?.socialSecurity).toBe(10_000)
+    expect(y2032On?.socialSecurity).toBe(7_700)
   })
 
   it('applies real spending decline on top of inflation after start age', () => {

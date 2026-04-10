@@ -85,6 +85,12 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
 
   rows.push(sectionHeader('Social Security'))
   rows.push(
+    assumptionRow(
+      'Model 23% SS benefit cut from 2032',
+      form.modelSsBenefitCutFrom2032 ? 'Yes (entered amounts × 77%)' : 'No',
+    ),
+  )
+  rows.push(
     assumptionRow('Annual SS COLA', formatPercentWhole(form.socialSecurityColaPercent)),
   )
   rows.push(assumptionRow('Retiree claim age', String(form.retireeClaimAge)))

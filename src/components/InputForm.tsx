@@ -12,6 +12,7 @@ import {
   SS_CLAIM_AGE_MAX,
   SS_CLAIM_AGE_MIN,
   SS_CLAIM_AGE_OPTIONS,
+  SS_TRUST_FUND_CUT_START_YEAR,
 } from '../lib/simulateRetirement'
 
 type Patch<K extends keyof FormState> = Pick<FormState, K>
@@ -434,6 +435,23 @@ export function InputForm({
           <p className="mb-2 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
             Your estimated annual benefits at the ages you select (not official SSA amounts).
           </p>
+          <div className="mb-3 flex items-start gap-2">
+            <input
+              id="modelSsBenefitCutFrom2032"
+              type="checkbox"
+              checked={form.modelSsBenefitCutFrom2032}
+              onChange={(e) => set('modelSsBenefitCutFrom2032', e.target.checked)}
+              className="mt-0.5 size-3.5 shrink-0 rounded border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
+            />
+            <label
+              htmlFor="modelSsBenefitCutFrom2032"
+              className="cursor-pointer text-[11px] leading-snug text-slate-700 dark:text-slate-300"
+            >
+              Model a 23% benefit reduction starting in {SS_TRUST_FUND_CUT_START_YEAR} (trust-fund
+              shortfall scenario). Retiree, spouse, and custom survivor amounts above are reduced in
+              the projection from that year onward.
+            </label>
+          </div>
           <div className="mb-3 max-w-xs">
             <NumField
               id="socialSecurityColaPercent"

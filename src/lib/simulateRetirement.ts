@@ -15,6 +15,12 @@ export const SS_CLAIM_AGE_MAX = 70
  */
 export const DEFAULT_SS_COLA_RATE = 0.026
 
+/** Calendar year from which the optional trust-fund shortfall scales down modeled SS benefits. */
+export const SS_TRUST_FUND_CUT_START_YEAR = 2032
+
+/** Retain this fraction of modeled benefits after a 23% cut (1 − 0.23). */
+export const SS_TRUST_FUND_BENEFIT_RETENTION = 0.77
+
 /**
  * Age at which many planners begin modeling lower real (inflation-adjusted) spending—the
  * transition from “go-go” to “slow-go” years (often cited around 70–75; 70 is a common default).
@@ -77,6 +83,11 @@ export interface SimulationInput {
    * benefit year on each benefit amount (simplified; actual SSA rules vary).
    */
   socialSecurityColaRate: number
+  /**
+   * When true, modeled Social Security (retiree, spouse, custom survivor) is multiplied by
+   * SS_TRUST_FUND_BENEFIT_RETENTION from SS_TRUST_FUND_CUT_START_YEAR onward (23% cut on entered amounts).
+   */
+  modelSsBenefitCutFrom2032: boolean
   /** After first death, household expense as % of joint expense (e.g. 75). */
   survivorExpensePercent: number
   survivorSSMode: SurvivorSSMode
@@ -162,6 +173,15 @@ function personSSCola(
   if (age < claimAge || age >= deathAge) return 0
   const yearsSinceClaim = age - claimAge
   return annualBenefitAtClaim * (1 + colaRate) ** yearsSinceClaim
+}
+
+function trustFundSsBenefitMultiplier(
+  calendarYear: number,
+  input: SimulationInput,
+): number {
+  if (!input.modelSsBenefitCutFrom2032) return 1
+  if (calendarYear < SS_TRUST_FUND_CUT_START_YEAR) return 1
+  return SS_TRUST_FUND_BENEFIT_RETENTION
 }
 
 function computeHouseholdSS(
@@ -539,13 +559,14 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       }
     }
 
-    const socialSecurity = computeHouseholdSS(
-      retireeAge,
-      spouseAge,
-      retireeAlive,
-      spouseAlive,
-      input,
-    )
+    const socialSecurity =
+      computeHouseholdSS(
+        retireeAge,
+        spouseAge,
+        retireeAlive,
+        spouseAlive,
+        input,
+      ) * trustFundSsBenefitMultiplier(y, input)
 
     const householdAlive = retireeAlive || spouseAlive
     const cadence = input.projectionCadence

@@ -58,18 +58,14 @@ export function ResultsTable({ rows }: ResultsTableProps) {
                 {r.calendarYear}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-200">
-                {r.retireeAge}
-                {!r.retireeAlive ? ' (deceased)' : ''}
+                {r.retireeAlive ? r.retireeAge : 'Deceased'}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-200">
-                {r.spouseAge != null ? (
-                  <>
-                    {r.spouseAge}
-                    {!r.spouseAlive ? ' (deceased)' : ''}
-                  </>
-                ) : (
-                  '—'
-                )}
+                {r.spouseAge != null
+                  ? r.spouseAlive
+                    ? r.spouseAge
+                    : 'Deceased'
+                  : '—'}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
                 {r.inRetirementPhase ? fmtMoney(r.annualExpense) : '—'}

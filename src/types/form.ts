@@ -31,6 +31,10 @@ export interface FormState {
   spouseAnnualSS: number
   /** Annual SS COLA as whole percent (e.g. 2.6 = 2.6%). */
   socialSecurityColaPercent: number
+  /**
+   * If true, simulation applies a 23% reduction to modeled SS from 2032 (retiree, spouse, survivor).
+   */
+  modelSsBenefitCutFrom2032: boolean
   survivorExpensePercent: number
   survivorSSMode: SurvivorSSMode
   customSurvivorAnnualSS: number
@@ -58,6 +62,7 @@ export function defaultFormState(nowYear: number): FormState {
     retireeAnnualSS: 30_000,
     spouseAnnualSS: 22_000,
     socialSecurityColaPercent: DEFAULT_SS_COLA_RATE * 100,
+    modelSsBenefitCutFrom2032: false,
     survivorExpensePercent: 75,
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: 30_000,
@@ -85,6 +90,7 @@ export function formStateToSimulationInput(form: FormState): SimulationInput {
     retireeAnnualSS: form.retireeAnnualSS,
     spouseAnnualSS: form.hasSpouse ? form.spouseAnnualSS : null,
     socialSecurityColaRate: form.socialSecurityColaPercent / 100,
+    modelSsBenefitCutFrom2032: form.modelSsBenefitCutFrom2032,
     survivorExpensePercent: form.survivorExpensePercent,
     survivorSSMode: form.survivorSSMode,
     customSurvivorAnnualSS:
