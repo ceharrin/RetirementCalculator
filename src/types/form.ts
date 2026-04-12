@@ -40,6 +40,8 @@ export interface FormState {
   customSurvivorAnnualSS: number
   /** One portfolio step per year vs twelve within each year. */
   projectionCadence: ProjectionCadence
+  /** Guyton–Klinger-style optional adjustment to nominal retirement spending (see simulation). */
+  useSpendingGuardrails: boolean
 }
 
 export function defaultFormState(nowYear: number): FormState {
@@ -67,6 +69,7 @@ export function defaultFormState(nowYear: number): FormState {
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: 30_000,
     projectionCadence: 'annual',
+    useSpendingGuardrails: false,
   }
 }
 
@@ -95,6 +98,7 @@ export function formStateToSimulationInput(form: FormState): SimulationInput {
     survivorSSMode: form.survivorSSMode,
     customSurvivorAnnualSS:
       form.survivorSSMode === 'custom' ? form.customSurvivorAnnualSS : null,
+    useSpendingGuardrails: form.useSpendingGuardrails,
     projectionCadence: form.projectionCadence,
   }
 }

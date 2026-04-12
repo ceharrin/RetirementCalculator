@@ -1,3 +1,11 @@
+import {
+  adjustSpendingForDecision,
+  DEFAULT_GUARDRAIL_BAND,
+  DEFAULT_GUARDRAIL_SPENDING_STEP,
+  guardrailDecision,
+  withdrawalRate,
+} from './retirementGuardrails'
+
 /** Long-run CPI-style default (illustrative, not a forecast). */
 export const DEFAULT_INFLATION_RATE = 0.03
 
@@ -99,6 +107,12 @@ export interface SimulationInput {
   spendingDeclineStartAge: number
   /** Annual real decline as decimal (e.g. 0.01 = 1%/yr) for each year at/above start age. */
   spendingDeclineAnnualRate: number
+  /**
+   * Guyton–Klinger-style MVP: record planned withdrawal ÷ portfolio (after return, before withdrawal)
+   * in the first retirement year; later years move nominal spending by ±10% if that rate strays
+   * outside ±20% of the anchor. No inflation skip; same annual spending for monthly cadence.
+   */
+  useSpendingGuardrails: boolean
   projectionCadence: ProjectionCadence
 }
 
@@ -182,6 +196,54 @@ function trustFundSsBenefitMultiplier(
   if (!input.modelSsBenefitCutFrom2032) return 1
   if (calendarYear < SS_TRUST_FUND_CUT_START_YEAR) return 1
   return SS_TRUST_FUND_BENEFIT_RETENTION
+}
+
+/**
+ * First retirement year: store anchor withdrawal rate only. Later years: optional ±10% nominal
+ * spending adjustment vs DEFAULT_GUARDRAIL_BAND around that rate.
+ */
+function adjustAnnualExpenseForGuardrails(
+  input: SimulationInput,
+  balanceStartOfYear: number,
+  portfolioReturn: number,
+  policyAnnualExpense: number,
+  socialSecurity: number,
+  inRetirementPhase: boolean,
+  householdAlive: boolean,
+  initialWithdrawalRate: { current: number | null },
+): number {
+  if (!input.useSpendingGuardrails || !inRetirementPhase || !householdAlive) {
+    return policyAnnualExpense
+  }
+
+  const afterReturn = balanceStartOfYear * (1 + portfolioReturn)
+  const plannedWithdrawal = Math.max(0, policyAnnualExpense - socialSecurity)
+
+  if (initialWithdrawalRate.current === null) {
+    if (afterReturn > 0) {
+      const rate = withdrawalRate(plannedWithdrawal, afterReturn)
+      if (Number.isFinite(rate) && rate > 0) {
+        initialWithdrawalRate.current = rate
+      }
+    }
+    return policyAnnualExpense
+  }
+
+  if (afterReturn <= 0) return policyAnnualExpense
+
+  const currentRate = withdrawalRate(plannedWithdrawal, afterReturn)
+  if (!Number.isFinite(currentRate)) return policyAnnualExpense
+
+  const decision = guardrailDecision(
+    currentRate,
+    initialWithdrawalRate.current,
+    DEFAULT_GUARDRAIL_BAND,
+  )
+  return adjustSpendingForDecision(
+    policyAnnualExpense,
+    decision,
+    DEFAULT_GUARDRAIL_SPENDING_STEP,
+  )
 }
 
 function computeHouseholdSS(
@@ -508,6 +570,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
   let balance = input.currentSavings
   const r = input.portfolioReturn
   const inf = input.inflationRate
+  const initialWithdrawalRate: { current: number | null } = { current: null }
 
   for (let y = input.startYear; y <= endYear; y++) {
     const retireeAge = input.retireeCurrentAge + (y - input.startYear)
@@ -569,6 +632,17 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       ) * trustFundSsBenefitMultiplier(y, input)
 
     const householdAlive = retireeAlive || spouseAlive
+    annualExpense = adjustAnnualExpenseForGuardrails(
+      input,
+      balance,
+      r,
+      annualExpense,
+      socialSecurity,
+      inRetirementPhase,
+      householdAlive,
+      initialWithdrawalRate,
+    )
+
     const cadence = input.projectionCadence
     const flow =
       cadence === 'monthly'

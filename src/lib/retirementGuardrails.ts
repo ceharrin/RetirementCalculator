@@ -1,22 +1,13 @@
 /**
- * Sketch: portfolio-linked spending guardrails (Guyton–Klinger style).
+ * Portfolio-linked spending guardrails (Guyton–Klinger style).
  *
- * Idea: compare **current withdrawal rate** (portfolio withdrawal ÷ portfolio) to the
- * **initial** rate from the first retirement year. If the portfolio has grown so much that
- * the same dollar withdrawal is a much **smaller** fraction of the portfolio, raise spending
- * (prosperity guardrail). If the portfolio has shrunk so withdrawals are a **larger**
- * fraction, cut spending (capital preservation guardrail).
+ * Compare **current planned withdrawal rate** (withdrawal ÷ portfolio) to the **anchor** rate
+ * from the first retirement year. Prosperity: portfolio grew → same-dollar withdrawal is a
+ * smaller fraction → optional spending increase. Capital preservation: the opposite.
  *
- * This module only holds **policy + pure math**. Wiring into `simulateRetirement` would:
- * 1. Track `initialWithdrawalRate` set once in the first in-retirement year (define whether
- *    the denominator is balance after return, before withdrawal, etc.—pick one and stay
- *    consistent).
- * 2. Each retirement year, after you know nominal spending need (inflation, decline, survivor
- *    rules) and Social Security, compute `withdrawal = max(0, expense - ss)`.
- * 3. Use balance **after** return and **before** withdrawal as portfolio for the rate check
- *    (common choice); recompute withdrawal if guardrail changes spending in that year.
- * 4. Optionally: Guyton-style **inflation skip**—omit the annual inflation bump on spending when
- *    the prior year’s portfolio return was negative (add prior-year return to loop state).
+ * **`simulateRetirement`** applies this when `useSpendingGuardrails` is true: anchor uses
+ * balance after return and before withdrawal; one ±10% nominal spending step per year when the
+ * rate strays outside ±20% of the anchor. No inflation skip in the current MVP.
  *
  * Illustrative only—not tax, legal, or planning advice.
  */

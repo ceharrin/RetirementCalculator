@@ -82,6 +82,12 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
     assumptionRow('Annual portfolio return', formatPercentWhole(form.portfolioReturnPercent)),
   )
   rows.push(assumptionRow('Annual inflation', formatPercentWhole(form.inflationPercent)))
+  rows.push(
+    assumptionRow(
+      'Guyton–Klinger spending guardrails',
+      form.useSpendingGuardrails ? 'Yes (±20% rate vs anchor, ±10% spending step)' : 'No',
+    ),
+  )
 
   rows.push(sectionHeader('Social Security'))
   rows.push(

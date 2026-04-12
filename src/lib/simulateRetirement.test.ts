@@ -28,6 +28,7 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     customSurvivorAnnualSS: null,
     socialSecurityColaRate: 0,
     modelSsBenefitCutFrom2032: false,
+    useSpendingGuardrails: false,
     spendingDeclineStartAge: 100,
     spendingDeclineAnnualRate: 0,
     projectionCadence: 'annual',
@@ -213,6 +214,48 @@ describe('simulateRetirement', () => {
     expect(y2032Off?.socialSecurity).toBe(10_000)
     expect(y2031On?.socialSecurity).toBe(10_000)
     expect(y2032On?.socialSecurity).toBe(7_700)
+  })
+
+  it('guardrails: reduces nominal spending when planned withdrawal rate exceeds the band', () => {
+    const common = {
+      retireeCurrentAge: 65,
+      retireeRetirementAge: 65,
+      retireeDeathAge: 75,
+      annualExpenseAtRetirementStart: 50_000,
+      currentSavings: 1_000_000,
+      portfolioReturn: -0.2,
+      inflationRate: 0,
+      retireeAnnualSS: 0,
+      spendingDeclineStartAge: 100,
+      spendingDeclineAnnualRate: 0,
+    }
+    const off = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: false }))
+    const on = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: true }))
+    const age66off = off.rows.find((r) => r.retireeAge === 66)
+    const age66on = on.rows.find((r) => r.retireeAge === 66)
+    expect(age66off?.annualExpense).toBe(50_000)
+    expect(age66on?.annualExpense).toBe(45_000)
+  })
+
+  it('guardrails: increases nominal spending when planned withdrawal rate falls below the band', () => {
+    const common = {
+      retireeCurrentAge: 65,
+      retireeRetirementAge: 65,
+      retireeDeathAge: 75,
+      annualExpenseAtRetirementStart: 40_000,
+      currentSavings: 1_000_000,
+      portfolioReturn: 0.3,
+      inflationRate: 0,
+      retireeAnnualSS: 0,
+      spendingDeclineStartAge: 100,
+      spendingDeclineAnnualRate: 0,
+    }
+    const off = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: false }))
+    const on = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: true }))
+    const age66off = off.rows.find((r) => r.retireeAge === 66)
+    const age66on = on.rows.find((r) => r.retireeAge === 66)
+    expect(age66off?.annualExpense).toBe(40_000)
+    expect(age66on?.annualExpense).toBe(44_000)
   })
 
   it('applies real spending decline on top of inflation after start age', () => {

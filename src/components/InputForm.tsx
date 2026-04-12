@@ -3,6 +3,10 @@ import type { FormState } from '../types/form'
 import type { ValidationIssue } from '../lib/simulateRetirement'
 import { parseMoneyInputToDollars } from '../lib/parseMoneyInput'
 import {
+  DEFAULT_GUARDRAIL_BAND,
+  DEFAULT_GUARDRAIL_SPENDING_STEP,
+} from '../lib/retirementGuardrails'
+import {
   DEFAULT_INFLATION_RATE,
   DEFAULT_PORTFOLIO_RETURN,
   DEFAULT_SPENDING_DECLINE_ANNUAL_RATE,
@@ -427,6 +431,34 @@ export function InputForm({
               error={fieldError(validationIssues, 'inflationRate')}
               hint="Applied to expenses every year; decline is real, on top of this."
             />
+            <div className="flex h-full min-h-0 min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-3">
+              <div className={labelSlotClass}>
+                <span className="block w-full">Spending guardrails</span>
+              </div>
+              <div className="flex min-h-9 items-start gap-2">
+                <input
+                  id="useSpendingGuardrails"
+                  type="checkbox"
+                  checked={form.useSpendingGuardrails}
+                  onChange={(e) => set('useSpendingGuardrails', e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 rounded border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
+                />
+                <label
+                  htmlFor="useSpendingGuardrails"
+                  className="cursor-pointer text-xs font-bold text-slate-900 dark:text-slate-100"
+                >
+                  Guyton–Klinger-style guardrails
+                </label>
+              </div>
+              <div className={hintSlotClass}>
+                <p className="text-slate-500 dark:text-slate-400">
+                  First retirement year sets an anchor withdrawal rate (vs portfolio after return).
+                  Later years raise or lower nominal spending by {(DEFAULT_GUARDRAIL_SPENDING_STEP * 100).toFixed(0)}% if
+                  the planned rate moves outside ±{(DEFAULT_GUARDRAIL_BAND * 100).toFixed(0)}% of that anchor.
+                  Illustrative only.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
