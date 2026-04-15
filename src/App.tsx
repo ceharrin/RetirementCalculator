@@ -21,6 +21,34 @@ import { defaultFormState, formStateToSimulationInput, type FormState } from './
 const PLANNING_YEAR = new Date().getFullYear()
 const initialForm = defaultFormState(PLANNING_YEAR)
 
+function pickGuardrailExampleYears(rows: SimulationResult['rows']): number[] {
+  const candidates = rows.filter((r) => r.inRetirementPhase && r.annualExpense > 0)
+  if (candidates.length <= 3) return candidates.map((r) => r.calendarYear)
+
+  const shuffled = [...candidates]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  const chosen: number[] = []
+  for (const row of shuffled) {
+    if (chosen.every((year) => Math.abs(year - row.calendarYear) >= 2)) {
+      chosen.push(row.calendarYear)
+    }
+    if (chosen.length === 3) break
+  }
+
+  if (chosen.length < 2) {
+    for (const row of shuffled) {
+      if (!chosen.includes(row.calendarYear)) chosen.push(row.calendarYear)
+      if (chosen.length >= 2) break
+    }
+  }
+
+  return chosen.sort((a, b) => a - b)
+}
+
 function applyHistoricalDefaults(prev: FormState): FormState {
   return {
     ...prev,
@@ -72,6 +100,7 @@ export default function App() {
       ? simulateRetirement(input)
       : null
   })
+  const [guardrailExampleYears, setGuardrailExampleYears] = useState<number[]>([])
 
   const simulationInput = useMemo(() => formStateToSimulationInput(form), [form])
   const validationIssues = useMemo(
@@ -83,7 +112,11 @@ export default function App() {
   const runProjection = useCallback(() => {
     if (!canRun) return
     setAssumptionsForReport({ ...form })
-    setResult(simulateRetirement(simulationInput))
+    const next = simulateRetirement(simulationInput)
+    setResult(next)
+    setGuardrailExampleYears(
+      form.useSpendingGuardrails ? pickGuardrailExampleYears(next.rows) : [],
+    )
   }, [canRun, form, simulationInput])
 
   const printOrSavePdf = useCallback(() => {
@@ -123,6 +156,8 @@ export default function App() {
                 setForm((f) => applyHistoricalDefaults(f))
               }
               validationIssues={validationIssues}
+              projectionRows={result?.rows}
+              guardrailExampleYears={form.useSpendingGuardrails ? guardrailExampleYears : []}
             />
             <div className="mt-6">
               <button
@@ -184,6 +219,9 @@ export default function App() {
                   <ResultsTable
                     rows={result.rows}
                     useSpendingGuardrails={result.useSpendingGuardrails}
+                    guardrailExampleYears={
+                      result.useSpendingGuardrails ? guardrailExampleYears : []
+                    }
                   />
                 </section>
                 <aside

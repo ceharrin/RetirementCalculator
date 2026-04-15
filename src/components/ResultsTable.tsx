@@ -1,9 +1,15 @@
 import type { GuardrailYearKind, YearProjection } from '../lib/simulateRetirement'
+import {
+  DEFAULT_GUARDRAIL_BAND,
+  DEFAULT_GUARDRAIL_SPENDING_STEP,
+} from '../lib/retirementGuardrails'
 
 interface ResultsTableProps {
   rows: YearProjection[]
   /** When true, show legend and highlight rows where guardrails affected spending (and thus withdrawals and balance). */
   useSpendingGuardrails?: boolean
+  /** Optional sampled years used by guardrail examples; highlight spending+portfolio cells in red. */
+  guardrailExampleYears?: number[]
 }
 
 function rowHighlightClass(shortfall: boolean, kind: GuardrailYearKind): string {
@@ -45,8 +51,31 @@ function fmtMoney(n: number) {
   })
 }
 
-export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps) {
+function guardrailComparisonTooltip(r: YearProjection): string {
+  const dropPercent = (DEFAULT_GUARDRAIL_BAND / (1 + DEFAULT_GUARDRAIL_BAND)) * 100
+  const portfolioDropAmount = r.endPortfolioBalance * (dropPercent / 100)
+  const portfolioDropScenario = Math.max(0, r.endPortfolioBalance - portfolioDropAmount)
+  const spendingAfterCut = Math.max(0, r.annualExpense * (1 - DEFAULT_GUARDRAIL_SPENDING_STEP))
+  return [
+    `Year ${r.calendarYear} guardrail comparison`,
+    `Portfolio current: ${fmtMoney(r.endPortfolioBalance)}`,
+    `Portfolio drop scenario (${dropPercent.toFixed(1)}%): ${fmtMoney(portfolioDropScenario)}`,
+    `Spending current: ${fmtMoney(r.annualExpense)}`,
+    `Spending after cut (${(DEFAULT_GUARDRAIL_SPENDING_STEP * 100).toFixed(0)}%): ${fmtMoney(spendingAfterCut)}`,
+  ].join('\n')
+}
+
+function tooltipLines(text: string): string[] {
+  return text.split('\n')
+}
+
+export function ResultsTable({
+  rows,
+  useSpendingGuardrails,
+  guardrailExampleYears,
+}: ResultsTableProps) {
   const showKey = Boolean(useSpendingGuardrails)
+  const guardrailExampleYearSet = new Set(guardrailExampleYears ?? [])
 
   return (
     <div className="space-y-3">
@@ -66,6 +95,11 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
               Violet
             </span>{' '}
             marks the first retirement year where the anchor withdrawal rate is set.
+            {' '}
+            <span className="inline-block rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-800 dark:bg-red-900/40 dark:text-red-200">
+              Red
+            </span>{' '}
+            marks sampled guardrail example years (spending and end balance cells).
           </p>
         </div>
       ) : null}
@@ -110,6 +144,18 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
         </thead>
         <tbody className="divide-y divide-indigo-50 bg-white dark:divide-indigo-950/30 dark:bg-slate-900">
           {rows.map((r) => (
+            (() => {
+              const isGuardrailExampleYear =
+                Boolean(useSpendingGuardrails) && guardrailExampleYearSet.has(r.calendarYear)
+              const sampledDropCellClass =
+                isGuardrailExampleYear && r.inRetirementPhase
+                  ? 'bg-red-100/80 font-semibold text-red-900 dark:bg-red-950/45 dark:text-red-200'
+                  : ''
+              const sampledDropTitle =
+                isGuardrailExampleYear && r.inRetirementPhase
+                  ? guardrailComparisonTooltip(r)
+                  : undefined
+              return (
             <tr
               key={r.calendarYear}
               className={rowHighlightClass(r.shortfall, r.guardrailYearKind)}
@@ -128,9 +174,26 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
                   : '—'}
               </td>
               <td
-                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${r.inRetirementPhase ? spendingCellClass(r.guardrailYearKind) : 'text-slate-800 dark:text-slate-200'}`}
+                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${r.inRetirementPhase ? spendingCellClass(r.guardrailYearKind) : 'text-slate-800 dark:text-slate-200'} ${sampledDropCellClass}`}
               >
-                {r.inRetirementPhase ? fmtMoney(r.annualExpense) : '—'}
+                {r.inRetirementPhase ? (
+                  sampledDropTitle ? (
+                    <span className="group relative inline-flex cursor-help items-center">
+                      {fmtMoney(r.annualExpense)}
+                      <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden min-w-[18rem] max-w-[22rem] whitespace-normal rounded-md border border-red-300 bg-white px-2 py-1.5 text-left text-[11px] leading-snug text-slate-800 shadow-lg group-hover:block dark:border-red-700 dark:bg-slate-900 dark:text-slate-100">
+                        {tooltipLines(sampledDropTitle).map((line, idx) => (
+                          <span key={`sp-${r.calendarYear}-${idx}`} className="block">
+                            {line}
+                          </span>
+                        ))}
+                      </span>
+                    </span>
+                  ) : (
+                    fmtMoney(r.annualExpense)
+                  )
+                ) : (
+                  '—'
+                )}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
                 {fmtMoney(r.socialSecurity)}
@@ -150,9 +213,22 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
                 {r.inRetirementPhase ? fmtMoney(r.portfolioWithdrawal) : '—'}
               </td>
               <td
-                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium text-indigo-950 dark:text-indigo-50 ${r.inRetirementPhase ? portfolioCellClass(r.guardrailYearKind) : ''}`}
+                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium text-indigo-950 dark:text-indigo-50 ${r.inRetirementPhase ? portfolioCellClass(r.guardrailYearKind) : ''} ${sampledDropCellClass}`}
               >
-                {fmtMoney(r.endPortfolioBalance)}
+                {sampledDropTitle ? (
+                  <span className="group relative inline-flex cursor-help items-center">
+                    {fmtMoney(r.endPortfolioBalance)}
+                    <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden min-w-[18rem] max-w-[22rem] whitespace-normal rounded-md border border-red-300 bg-white px-2 py-1.5 text-left text-[11px] leading-snug text-slate-800 shadow-lg group-hover:block dark:border-red-700 dark:bg-slate-900 dark:text-slate-100">
+                      {tooltipLines(sampledDropTitle).map((line, idx) => (
+                        <span key={`bal-${r.calendarYear}-${idx}`} className="block">
+                          {line}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                ) : (
+                  fmtMoney(r.endPortfolioBalance)
+                )}
               </td>
               <td className="px-3 py-2 text-center text-slate-800 dark:text-slate-200">
                 {r.shortfall ? (
@@ -162,6 +238,8 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
                 )}
               </td>
             </tr>
+              )
+            })()
           ))}
         </tbody>
       </table>

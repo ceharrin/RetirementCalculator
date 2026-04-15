@@ -1,4 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import type { FormState } from '../types/form'
 import type { ValidationIssue } from '../lib/simulateRetirement'
 import { parseMoneyInputToDollars } from '../lib/parseMoneyInput'
@@ -19,6 +29,7 @@ import {
   SS_TRUST_FUND_CUT_START_YEAR,
   type OneTimeExpenseInput,
   type WindfallInput,
+  type YearProjection,
 } from '../lib/simulateRetirement'
 
 type Patch<K extends keyof FormState> = Pick<FormState, K>
@@ -28,6 +39,8 @@ interface InputFormProps {
   onChange: (patch: Partial<FormState>) => void
   onApplyHistoricalDefaults: () => void
   validationIssues: ValidationIssue[]
+  projectionRows?: YearProjection[]
+  guardrailExampleYears?: number[]
 }
 
 function fieldError(issues: ValidationIssue[], field: string): string | undefined {
@@ -48,6 +61,14 @@ const inputClass =
 function formatMoneyInteger(n: number): string {
   if (!Number.isFinite(n)) return ''
   return Math.trunc(n).toLocaleString(undefined, { maximumFractionDigits: 0 })
+}
+
+function formatMoney(n: number): string {
+  return n.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  })
 }
 
 function clampInteger(n: number, min?: number, max?: number): number {
@@ -221,6 +242,8 @@ export function InputForm({
   onChange,
   onApplyHistoricalDefaults,
   validationIssues,
+  projectionRows,
+  guardrailExampleYears,
 }: InputFormProps) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ [key]: value } as Patch<K>)
@@ -262,6 +285,16 @@ export function InputForm({
       'oneTimeExpenses',
       form.oneTimeExpenses.filter((_, i) => i !== idx),
     )
+  const guardrailDecreaseTriggerDropPercent =
+    (DEFAULT_GUARDRAIL_BAND / (1 + DEFAULT_GUARDRAIL_BAND)) * 100
+  const guardrailExamples = useMemo(() => {
+    if (!form.useSpendingGuardrails || !projectionRows || projectionRows.length === 0) return []
+    if (!guardrailExampleYears || guardrailExampleYears.length === 0) return []
+    const yearSet = new Set(guardrailExampleYears)
+    return projectionRows.filter(
+      (r) => yearSet.has(r.calendarYear) && r.inRetirementPhase && r.annualExpense > 0,
+    )
+  }, [form.useSpendingGuardrails, guardrailExampleYears, projectionRows])
 
   return (
     <form className="text-left" onSubmit={(e) => e.preventDefault()}>
@@ -471,34 +504,99 @@ export function InputForm({
               error={fieldError(validationIssues, 'inflationRate')}
               hint="Applied to expenses every year; decline is real, on top of this."
             />
-            <div className="flex h-full min-h-0 min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-3">
-              <div className={labelSlotClass}>
-                <span className="block w-full">Spending guardrails</span>
-              </div>
-              <div className="flex min-h-9 items-start gap-2">
-                <input
-                  id="useSpendingGuardrails"
-                  type="checkbox"
-                  checked={form.useSpendingGuardrails}
-                  onChange={(e) => set('useSpendingGuardrails', e.target.checked)}
-                  className="mt-0.5 size-3.5 shrink-0 rounded border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
-                />
-                <label
-                  htmlFor="useSpendingGuardrails"
-                  className="cursor-pointer text-xs font-bold text-slate-900 dark:text-slate-100"
-                >
-                  Guyton–Klinger-style guardrails
-                </label>
-              </div>
-              <div className={hintSlotClass}>
-                <p className="text-slate-500 dark:text-slate-400">
-                  First retirement year sets an anchor withdrawal rate (vs portfolio after return).
-                  Later years raise or lower nominal spending by {(DEFAULT_GUARDRAIL_SPENDING_STEP * 100).toFixed(0)}% if
-                  the planned rate moves outside ±{(DEFAULT_GUARDRAIL_BAND * 100).toFixed(0)}% of that anchor.
-                  Illustrative only.
+          </div>
+        </section>
+
+        <section className="border-b border-indigo-100/90 px-3 py-2.5 dark:border-indigo-900/40">
+          <h3 className={sectionTitle}>Guardrails</h3>
+          <div className="flex min-h-8 items-start gap-2">
+            <input
+              id="useSpendingGuardrails"
+              type="checkbox"
+              checked={form.useSpendingGuardrails}
+              onChange={(e) => set('useSpendingGuardrails', e.target.checked)}
+              className="mt-0.5 size-3.5 shrink-0 rounded border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
+            />
+            <label
+              htmlFor="useSpendingGuardrails"
+              className="cursor-pointer text-xs font-bold text-slate-900 dark:text-slate-100"
+            >
+              Guyton–Klinger-style spending guardrails
+            </label>
+          </div>
+          <div className={hintSlotClass}>
+            <p className="text-slate-500 dark:text-slate-400">
+              First retirement year sets an anchor withdrawal rate (vs portfolio after return).
+              Later years raise or lower nominal spending by {(DEFAULT_GUARDRAIL_SPENDING_STEP * 100).toFixed(0)}% if
+              the planned rate moves outside ±{(DEFAULT_GUARDRAIL_BAND * 100).toFixed(0)}% of that anchor.
+              Illustrative only.
+            </p>
+            {form.useSpendingGuardrails ? (
+              <>
+                <p className="font-medium text-indigo-700 dark:text-indigo-300">
+                  Spending decrease trigger: portfolio would need to drop about{' '}
+                  {guardrailDecreaseTriggerDropPercent.toFixed(1)}% from the anchor year level to
+                  force a guardrail spending cut (assuming similar planned withdrawal dollars).
                 </p>
-              </div>
-            </div>
+                {guardrailExamples.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-indigo-700 dark:text-indigo-300">
+                      Example years from your current projection:
+                    </p>
+                    <div className="h-56 w-full rounded-md border border-indigo-200/80 bg-white/70 p-2 dark:border-indigo-800/50 dark:bg-slate-900/60">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={guardrailExamples.map((r) => {
+                            const dropAmount =
+                              r.endPortfolioBalance * (guardrailDecreaseTriggerDropPercent / 100)
+                            return {
+                              year: String(r.calendarYear),
+                              portfolioBase: Math.max(0, r.endPortfolioBalance),
+                              portfolioDrop: Math.max(0, r.endPortfolioBalance - dropAmount),
+                              spendingBase: Math.max(0, r.annualExpense),
+                              spendingDrop: Math.max(
+                                0,
+                                r.annualExpense * (1 - DEFAULT_GUARDRAIL_SPENDING_STEP),
+                              ),
+                            }
+                          })}
+                          margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#c7d2fe" />
+                          <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#4338ca' }} />
+                          <YAxis
+                            tick={{ fontSize: 11, fill: '#4338ca' }}
+                            tickFormatter={(v) => {
+                              const n = Number(v)
+                              if (!Number.isFinite(n)) return '$0'
+                              if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+                              if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}k`
+                              return `$${Math.round(n)}`
+                            }}
+                            width={54}
+                          />
+                          <Tooltip
+                            formatter={(value: number, name: string) => [
+                              formatMoney(typeof value === 'number' ? value : Number(value)),
+                              name,
+                            ]}
+                          />
+                          <Legend />
+                          <Bar dataKey="portfolioBase" name="Portfolio (current)" fill="#6366f1" />
+                          <Bar dataKey="portfolioDrop" name="Portfolio (drop scenario)" fill="#dc2626" />
+                          <Bar dataKey="spendingBase" name="Spending (current)" fill="#2563eb" />
+                          <Bar dataKey="spendingDrop" name="Spending (after cut)" fill="#ef4444" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <p className="mt-1 text-[11px] text-indigo-700 dark:text-indigo-300">
+                      Red bars show drop scenarios where portfolio value declines and spending is
+                      reduced by guardrails.
+                    </p>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
         </section>
 
