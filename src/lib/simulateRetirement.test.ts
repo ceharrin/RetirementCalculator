@@ -26,6 +26,7 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     otherAnnualIncome: 0,
     otherIncomeStartAge: 67,
     windfalls: [],
+    oneTimeExpenses: [],
     survivorExpensePercent: 75,
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: null,
@@ -408,5 +409,25 @@ describe('simulateRetirement', () => {
     expect(at65?.windfall).toBe(0)
     expect(at66?.windfall).toBe(50_000)
     expect(at66?.endPortfolioBalance).toBe(150_000)
+  })
+
+  it('subtracts one-time expenses from portfolio in matching age year', () => {
+    const { rows } = simulateRetirement(
+      baseInput({
+        retireeCurrentAge: 65,
+        retireeRetirementAge: 65,
+        retireeDeathAge: 68,
+        annualExpenseAtRetirementStart: 0,
+        currentSavings: 100_000,
+        portfolioReturn: 0,
+        inflationRate: 0,
+        oneTimeExpenses: [{ title: 'Roof replacement', amount: 30_000, startAge: 66 }],
+      }),
+    )
+    const at65 = rows.find((r) => r.retireeAge === 65)
+    const at66 = rows.find((r) => r.retireeAge === 66)
+    expect(at65?.oneTimeExpense).toBe(0)
+    expect(at66?.oneTimeExpense).toBe(30_000)
+    expect(at66?.endPortfolioBalance).toBe(70_000)
   })
 })

@@ -17,6 +17,7 @@ import {
   SS_CLAIM_AGE_MIN,
   SS_CLAIM_AGE_OPTIONS,
   SS_TRUST_FUND_CUT_START_YEAR,
+  type OneTimeExpenseInput,
   type WindfallInput,
 } from '../lib/simulateRetirement'
 
@@ -241,6 +242,25 @@ export function InputForm({
     set(
       'windfalls',
       form.windfalls.filter((_, i) => i !== idx),
+    )
+  const addOneTimeExpense = () =>
+    set('oneTimeExpenses', [
+      ...form.oneTimeExpenses,
+      {
+        title: `Expense ${form.oneTimeExpenses.length + 1}`,
+        amount: 0,
+        startAge: form.retireeRetirementAge,
+      },
+    ])
+  const updateOneTimeExpense = (idx: number, patch: Partial<OneTimeExpenseInput>) =>
+    set(
+      'oneTimeExpenses',
+      form.oneTimeExpenses.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
+    )
+  const removeOneTimeExpense = (idx: number) =>
+    set(
+      'oneTimeExpenses',
+      form.oneTimeExpenses.filter((_, i) => i !== idx),
     )
 
   return (
@@ -555,15 +575,8 @@ export function InputForm({
         </section>
 
         <section className="border-b border-indigo-100/90 px-3 py-2.5 dark:border-indigo-900/40">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
+          <div className="mb-1.5">
             <h3 className={sectionTitle}>Other Income</h3>
-            <button
-              type="button"
-              onClick={addWindfall}
-              className="rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
-            >
-              Add windfall
-            </button>
           </div>
           <div className="mb-2 grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
             <MoneyField
@@ -586,9 +599,18 @@ export function InputForm({
               hint="If earlier than current age, income starts immediately."
             />
           </div>
-          <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-            Windfalls
-          </p>
+          <div className="mb-0.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+              Windfalls
+            </p>
+            <button
+              type="button"
+              onClick={addWindfall}
+              className="rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
+            >
+              Add windfall
+            </button>
+          </div>
           <p className="mb-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
             One-time future amounts (cash or assets) that are invested into the portfolio in that
             year.
@@ -665,6 +687,109 @@ export function InputForm({
                       <button
                         type="button"
                         onClick={() => removeWindfall(idx)}
+                        className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+              One-time expenses
+            </p>
+            <button
+              type="button"
+              onClick={addOneTimeExpense}
+              className="rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
+            >
+              Add one-time expense
+            </button>
+          </div>
+          <p className="mb-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            Ad hoc one-time costs funded from your portfolio in the specified year.
+          </p>
+          {fieldError(validationIssues, 'oneTimeExpenses') ? (
+            <p className="mb-1.5 text-[11px] text-red-600 dark:text-red-400" role="alert">
+              {fieldError(validationIssues, 'oneTimeExpenses')}
+            </p>
+          ) : null}
+          {form.oneTimeExpenses.length === 0 ? (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              No one-time expenses added.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {form.oneTimeExpenses.map((e, idx) => (
+                <div
+                  key={`one-time-expense-${idx}`}
+                  className="rounded-md border border-indigo-100/80 p-1.5 dark:border-indigo-800/50"
+                >
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-12 sm:items-end">
+                    <div className="sm:col-span-5">
+                      <label
+                        htmlFor={`one-time-expense-title-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Title
+                      </label>
+                      <input
+                        id={`one-time-expense-title-${idx}`}
+                        type="text"
+                        value={e.title}
+                        onChange={(ev) =>
+                          updateOneTimeExpense(idx, { title: ev.target.value })
+                        }
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label
+                        htmlFor={`one-time-expense-amount-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Amount ($)
+                      </label>
+                      <input
+                        id={`one-time-expense-amount-${idx}`}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInteger(e.amount)}
+                        onChange={(ev) =>
+                          updateOneTimeExpense(idx, {
+                            amount: clampInteger(parseMoneyInputToDollars(ev.target.value), 0),
+                          })
+                        }
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor={`one-time-expense-age-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Age
+                      </label>
+                      <input
+                        id={`one-time-expense-age-${idx}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={18}
+                        max={120}
+                        value={e.startAge}
+                        onChange={(ev) =>
+                          updateOneTimeExpense(idx, { startAge: Number(ev.target.value) })
+                        }
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => removeOneTimeExpense(idx)}
                         className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
                       >
                         Remove

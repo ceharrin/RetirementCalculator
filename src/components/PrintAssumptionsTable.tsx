@@ -122,6 +122,20 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
     })
   }
 
+  rows.push(sectionHeader('One-time expenses'))
+  if (form.oneTimeExpenses.length === 0) {
+    rows.push(assumptionRow('One-time expenses', 'None'))
+  } else {
+    form.oneTimeExpenses.forEach((e, idx) => {
+      rows.push(
+        assumptionRow(
+          e.title.trim().length > 0 ? e.title : `One-time expense ${idx + 1}`,
+          `${formatMoney(e.amount)} at age ${e.startAge}`,
+        ),
+      )
+    })
+  }
+
   if (form.hasSpouse) {
     rows.push(sectionHeader('After first death'))
     rows.push(

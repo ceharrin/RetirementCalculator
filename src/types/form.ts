@@ -6,6 +6,7 @@ import {
   type ProjectionCadence,
   type SimulationInput,
   type SurvivorSSMode,
+  type OneTimeExpenseInput,
   type WindfallInput,
 } from '../lib/simulateRetirement'
 
@@ -33,6 +34,7 @@ export interface FormState {
   otherAnnualIncome: number
   otherIncomeStartAge: number
   windfalls: WindfallInput[]
+  oneTimeExpenses: OneTimeExpenseInput[]
   /** Annual SS COLA as whole percent (e.g. 2.6 = 2.6%). */
   socialSecurityColaPercent: number
   /**
@@ -70,6 +72,7 @@ export function defaultFormState(nowYear: number): FormState {
     otherAnnualIncome: 0,
     otherIncomeStartAge: 67,
     windfalls: [],
+    oneTimeExpenses: [],
     socialSecurityColaPercent: DEFAULT_SS_COLA_RATE * 100,
     modelSsBenefitCutFrom2032: false,
     survivorExpensePercent: 75,
@@ -102,6 +105,7 @@ export function formStateToSimulationInput(form: FormState): SimulationInput {
     otherAnnualIncome: form.otherAnnualIncome,
     otherIncomeStartAge: form.otherIncomeStartAge,
     windfalls: form.windfalls,
+    oneTimeExpenses: form.oneTimeExpenses,
     socialSecurityColaRate: form.socialSecurityColaPercent / 100,
     modelSsBenefitCutFrom2032: form.modelSsBenefitCutFrom2032,
     survivorExpensePercent: form.survivorExpensePercent,

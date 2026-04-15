@@ -95,6 +95,9 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
               Windfall
             </th>
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
+              One-time expense
+            </th>
+            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
               Portfolio withdrawal
             </th>
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100">
@@ -137,6 +140,9 @@ export function ResultsTable({ rows, useSpendingGuardrails }: ResultsTableProps)
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
                 {r.windfall > 0 ? fmtMoney(r.windfall) : '—'}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                {r.oneTimeExpense > 0 ? fmtMoney(r.oneTimeExpense) : '—'}
               </td>
               <td
                 className={`whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 ${r.inRetirementPhase ? portfolioCellClass(r.guardrailYearKind) : ''}`}

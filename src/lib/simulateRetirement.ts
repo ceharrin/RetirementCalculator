@@ -92,6 +92,8 @@ export interface SimulationInput {
   otherIncomeStartAge: number
   /** One-time contributions added to portfolio in the matching retiree age year. */
   windfalls: WindfallInput[]
+  /** One-time portfolio-funded expenses charged in the matching retiree age year. */
+  oneTimeExpenses: OneTimeExpenseInput[]
   /**
    * Annual Social Security COLA as decimal (e.g. 0.026). Applied each year after the first
    * benefit year on each benefit amount (simplified; actual SSA rules vary).
@@ -137,6 +139,7 @@ export interface YearProjection {
   socialSecurity: number
   otherIncome: number
   windfall: number
+  oneTimeExpense: number
   portfolioWithdrawal: number
   /** Balance after return and withdrawal */
   endPortfolioBalance: number
@@ -158,6 +161,12 @@ export interface ValidationIssue {
 }
 
 export interface WindfallInput {
+  title: string
+  amount: number
+  startAge: number
+}
+
+export interface OneTimeExpenseInput {
   title: string
   amount: number
   startAge: number
@@ -337,6 +346,19 @@ function computeWindfallForYear(
 ): number {
   if (!(retireeAlive || spouseAlive)) return 0
   return input.windfalls.reduce((sum, w) => (w.startAge === retireeAge ? sum + w.amount : sum), 0)
+}
+
+function computeOneTimeExpenseForYear(
+  retireeAge: number,
+  retireeAlive: boolean,
+  spouseAlive: boolean,
+  input: SimulationInput,
+): number {
+  if (!(retireeAlive || spouseAlive)) return 0
+  return input.oneTimeExpenses.reduce(
+    (sum, e) => (e.startAge === retireeAge ? sum + e.amount : sum),
+    0,
+  )
 }
 
 interface YearCashFlowResult {
@@ -591,6 +613,27 @@ export function validateSimulationInput(
     }
   })
 
+  input.oneTimeExpenses.forEach((e, idx) => {
+    if (e.title.trim().length === 0) {
+      issues.push({
+        field: 'oneTimeExpenses',
+        message: `One-time expense #${idx + 1} needs a title.`,
+      })
+    }
+    if (!Number.isFinite(e.amount) || e.amount < 0) {
+      issues.push({
+        field: 'oneTimeExpenses',
+        message: `One-time expense #${idx + 1} amount must be zero or greater.`,
+      })
+    }
+    if (!Number.isFinite(e.startAge) || e.startAge < 18 || e.startAge > 120) {
+      issues.push({
+        field: 'oneTimeExpenses',
+        message: `One-time expense #${idx + 1} age should be between 18 and 120.`,
+      })
+    }
+  })
+
   if (
     input.survivorExpensePercent < 10 ||
     input.survivorExpensePercent > 150
@@ -725,12 +768,18 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       spouseAlive,
       input,
     )
-    const balanceWithWindfall = balance + windfall
+    const oneTimeExpense = computeOneTimeExpenseForYear(
+      retireeAge,
+      retireeAlive,
+      spouseAlive,
+      input,
+    )
+    const balanceAfterAdjustments = Math.max(0, balance + windfall - oneTimeExpense)
 
     const householdAlive = retireeAlive || spouseAlive
     const guardrailAdjust = adjustAnnualExpenseForGuardrails(
       input,
-      balanceWithWindfall,
+      balanceAfterAdjustments,
       r,
       annualExpense,
       socialSecurity,
@@ -745,8 +794,8 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
     const flow =
       cadence === 'monthly'
         ? applyMonthlyYearStep(
-            balanceWithWindfall,
-            // Windfalls are invested as they arrive, before this year's return/withdrawals.
+            balanceAfterAdjustments,
+            // Windfalls and one-time expenses are applied before this year's return/withdrawals.
             annualExpense,
             totalIncome,
             inRetirementPhase,
@@ -754,7 +803,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
             r,
           )
         : applyAnnualYearStep(
-            balanceWithWindfall,
+            balanceAfterAdjustments,
             annualExpense,
             totalIncome,
             inRetirementPhase,
@@ -774,6 +823,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       socialSecurity,
       otherIncome,
       windfall,
+      oneTimeExpense,
       portfolioWithdrawal: flow.portfolioWithdrawal,
       endPortfolioBalance: flow.endPortfolioBalance,
       shortfall: flow.shortfall,
