@@ -25,14 +25,31 @@ function pickGuardrailExampleYears(rows: SimulationResult['rows']): number[] {
   const candidates = rows.filter((r) => r.inRetirementPhase && r.annualExpense > 0)
   if (candidates.length <= 3) return candidates.map((r) => r.calendarYear)
 
-  const shuffled = [...candidates]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  const shuffled = (arr: typeof candidates) => {
+    const copy = [...arr]
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[copy[i], copy[j]] = [copy[j], copy[i]]
+    }
+    return copy
   }
 
+  const decreases = candidates.filter((r) => r.guardrailYearKind === 'decrease')
+  const increases = candidates.filter((r) => r.guardrailYearKind === 'increase')
+
   const chosen: number[] = []
-  for (const row of shuffled) {
+  const pickOne = (arr: typeof candidates) => {
+    if (arr.length === 0) return
+    const year = arr[Math.floor(Math.random() * arr.length)].calendarYear
+    if (!chosen.includes(year)) chosen.push(year)
+  }
+
+  // Ensure both triggers are represented when they exist in the modeled rows.
+  pickOne(decreases)
+  pickOne(increases)
+
+  const randomPool = shuffled(candidates)
+  for (const row of randomPool) {
     if (chosen.every((year) => Math.abs(year - row.calendarYear) >= 2)) {
       chosen.push(row.calendarYear)
     }
@@ -40,9 +57,16 @@ function pickGuardrailExampleYears(rows: SimulationResult['rows']): number[] {
   }
 
   if (chosen.length < 2) {
-    for (const row of shuffled) {
+    for (const row of randomPool) {
       if (!chosen.includes(row.calendarYear)) chosen.push(row.calendarYear)
       if (chosen.length >= 2) break
+    }
+  }
+
+  if (chosen.length < 3) {
+    for (const row of randomPool) {
+      if (!chosen.includes(row.calendarYear)) chosen.push(row.calendarYear)
+      if (chosen.length >= 3) break
     }
   }
 
@@ -218,10 +242,6 @@ export default function App() {
                   </h2>
                   <ResultsTable
                     rows={result.rows}
-                    useSpendingGuardrails={result.useSpendingGuardrails}
-                    guardrailExampleYears={
-                      result.useSpendingGuardrails ? guardrailExampleYears : []
-                    }
                   />
                 </section>
                 <aside

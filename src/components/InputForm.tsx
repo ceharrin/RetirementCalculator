@@ -287,6 +287,8 @@ export function InputForm({
     )
   const guardrailDecreaseTriggerDropPercent =
     (DEFAULT_GUARDRAIL_BAND / (1 + DEFAULT_GUARDRAIL_BAND)) * 100
+  const guardrailIncreaseTriggerRisePercent =
+    (DEFAULT_GUARDRAIL_BAND / (1 - DEFAULT_GUARDRAIL_BAND)) * 100
   const guardrailExamples = useMemo(() => {
     if (!form.useSpendingGuardrails || !projectionRows || projectionRows.length === 0) return []
     if (!guardrailExampleYears || guardrailExampleYears.length === 0) return []
@@ -533,10 +535,15 @@ export function InputForm({
             </p>
             {form.useSpendingGuardrails ? (
               <>
-                <p className="font-medium text-indigo-700 dark:text-indigo-300">
-                  Spending decrease trigger: portfolio would need to drop about{' '}
+                <p className="font-medium text-red-600 dark:text-red-300">
+                  Preservation trigger: portfolio would need to drop about{' '}
                   {guardrailDecreaseTriggerDropPercent.toFixed(1)}% from the anchor year level to
                   force a guardrail spending cut (assuming similar planned withdrawal dollars).
+                </p>
+                <p className="font-medium text-emerald-700 dark:text-emerald-300">
+                  Prosperity trigger: portfolio would need to rise about{' '}
+                  {guardrailIncreaseTriggerRisePercent.toFixed(1)}% from the anchor year level to
+                  allow a guardrail spending increase (assuming similar planned withdrawal dollars).
                 </p>
                 {guardrailExamples.length > 0 ? (
                   <div>
@@ -549,14 +556,21 @@ export function InputForm({
                           data={guardrailExamples.map((r) => {
                             const dropAmount =
                               r.endPortfolioBalance * (guardrailDecreaseTriggerDropPercent / 100)
+                            const riseAmount =
+                              r.endPortfolioBalance * (guardrailIncreaseTriggerRisePercent / 100)
                             return {
                               year: String(r.calendarYear),
                               portfolioBase: Math.max(0, r.endPortfolioBalance),
                               portfolioDrop: Math.max(0, r.endPortfolioBalance - dropAmount),
+                              portfolioRise: Math.max(0, r.endPortfolioBalance + riseAmount),
                               spendingBase: Math.max(0, r.annualExpense),
                               spendingDrop: Math.max(
                                 0,
                                 r.annualExpense * (1 - DEFAULT_GUARDRAIL_SPENDING_STEP),
+                              ),
+                              spendingRise: Math.max(
+                                0,
+                                r.annualExpense * (1 + DEFAULT_GUARDRAIL_SPENDING_STEP),
                               ),
                             }
                           })}
@@ -580,18 +594,28 @@ export function InputForm({
                               formatMoney(typeof value === 'number' ? value : Number(value)),
                               name,
                             ]}
+                            wrapperStyle={{ zIndex: 30 }}
+                            contentStyle={{
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #c7d2fe',
+                              borderRadius: 8,
+                              opacity: 1,
+                            }}
+                            labelStyle={{ color: '#1e1b4b', fontWeight: 600 }}
                           />
                           <Legend />
                           <Bar dataKey="portfolioBase" name="Portfolio (current)" fill="#6366f1" />
                           <Bar dataKey="portfolioDrop" name="Portfolio (drop scenario)" fill="#dc2626" />
+                          <Bar dataKey="portfolioRise" name="Portfolio (prosperity scenario)" fill="#16a34a" />
                           <Bar dataKey="spendingBase" name="Spending (current)" fill="#2563eb" />
                           <Bar dataKey="spendingDrop" name="Spending (after cut)" fill="#ef4444" />
+                          <Bar dataKey="spendingRise" name="Spending (after increase)" fill="#22c55e" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                     <p className="mt-1 text-[11px] text-indigo-700 dark:text-indigo-300">
-                      Red bars show drop scenarios where portfolio value declines and spending is
-                      reduced by guardrails.
+                      Red bars show preservation scenarios (portfolio drop + spending cut). Green
+                      bars show prosperity scenarios (portfolio rise + spending increase).
                     </p>
                   </div>
                 ) : null}
