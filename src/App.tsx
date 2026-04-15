@@ -153,7 +153,9 @@ export default function App() {
                     ) : null}
                   </p>
                 </div>
-                <PrintAssumptionsTable form={assumptionsForReport ?? form} />
+                <div className="print:order-2">
+                  <PrintAssumptionsTable form={assumptionsForReport ?? form} />
+                </div>
                 <div className="no-print">
                   <button
                     type="button"
@@ -166,7 +168,7 @@ export default function App() {
                     Opens your browser print dialog—choose &quot;Save as PDF&quot; to download.
                   </p>
                 </div>
-                <section>
+                <section className="print:order-1">
                   <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Portfolio and withdrawals
                   </h2>
@@ -175,7 +177,7 @@ export default function App() {
                     useSpendingGuardrails={result.useSpendingGuardrails}
                   />
                 </section>
-                <section>
+                <section className="print:order-3">
                   <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Year-by-year detail
                   </h2>
@@ -185,7 +187,7 @@ export default function App() {
                   />
                 </section>
                 <aside
-                  className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100 print:border-slate-300 print:bg-slate-50 print:text-slate-800 dark:print:bg-slate-50 dark:print:text-slate-800"
+                  className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100 print:order-4 print:border-slate-300 print:bg-slate-50 print:text-slate-800 dark:print:bg-slate-50 dark:print:text-slate-800"
                   role="note"
                 >
                   <strong className="font-semibold">Disclaimer.</strong> This tool is for education
