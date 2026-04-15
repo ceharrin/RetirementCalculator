@@ -13,6 +13,11 @@ function fmtMoney(n: number) {
 }
 
 export function ResultsTable({ rows }: ResultsTableProps) {
+  const showSpouseColumn = rows.some((r) => r.spouseAge != null)
+  const showOtherIncomeColumn = rows.some((r) => r.otherIncome > 0)
+  const showWindfallColumn = rows.some((r) => r.windfall > 0)
+  const showOneTimeExpenseColumn = rows.some((r) => r.oneTimeExpense > 0)
+
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto rounded-xl border border-indigo-200/70 bg-white shadow-sm shadow-indigo-100/20 dark:border-indigo-800/50 dark:bg-slate-900 dark:shadow-indigo-950/20 print:rounded-none print:border-slate-300 print:shadow-none">
@@ -25,24 +30,32 @@ export function ResultsTable({ rows }: ResultsTableProps) {
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
               Retiree age
             </th>
-            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
-              Spouse age
-            </th>
+            {showSpouseColumn ? (
+              <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
+                Spouse age
+              </th>
+            ) : null}
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
               Expenses
             </th>
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
               Soc Sec
             </th>
-            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
-              Other inc
-            </th>
-            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
-              Windfall
-            </th>
-            <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
-              One-time exp
-            </th>
+            {showOtherIncomeColumn ? (
+              <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
+                Other inc
+              </th>
+            ) : null}
+            {showWindfallColumn ? (
+              <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
+                Windfall
+              </th>
+            ) : null}
+            {showOneTimeExpenseColumn ? (
+              <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
+                One-time exp
+              </th>
+            ) : null}
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">
               Port w/d
             </th>
@@ -66,28 +79,36 @@ export function ResultsTable({ rows }: ResultsTableProps) {
               <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
                 {r.retireeAlive ? r.retireeAge : 'Deceased'}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
-                {r.spouseAge != null
-                  ? r.spouseAlive
-                    ? r.spouseAge
-                    : 'Deceased'
-                  : '—'}
-              </td>
+              {showSpouseColumn ? (
+                <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
+                  {r.spouseAge != null
+                    ? r.spouseAlive
+                      ? r.spouseAge
+                      : 'Deceased'
+                    : '—'}
+                </td>
+              ) : null}
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
                 {r.inRetirementPhase ? fmtMoney(r.annualExpense) : '—'}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
                 {fmtMoney(r.socialSecurity)}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
-                {fmtMoney(r.otherIncome)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
-                {r.windfall > 0 ? fmtMoney(r.windfall) : '—'}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
-                {r.oneTimeExpense > 0 ? fmtMoney(r.oneTimeExpense) : '—'}
-              </td>
+              {showOtherIncomeColumn ? (
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
+                  {fmtMoney(r.otherIncome)}
+                </td>
+              ) : null}
+              {showWindfallColumn ? (
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
+                  {r.windfall > 0 ? fmtMoney(r.windfall) : '—'}
+                </td>
+              ) : null}
+              {showOneTimeExpenseColumn ? (
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
+                  {r.oneTimeExpense > 0 ? fmtMoney(r.oneTimeExpense) : '—'}
+                </td>
+              ) : null}
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200 print:px-1 print:py-0.5">
                 {r.inRetirementPhase ? fmtMoney(r.portfolioWithdrawal) : '—'}
               </td>
