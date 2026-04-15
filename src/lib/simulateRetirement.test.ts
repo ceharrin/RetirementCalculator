@@ -25,6 +25,7 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     spouseAnnualSS: null,
     otherAnnualIncome: 0,
     otherIncomeStartAge: 67,
+    windfalls: [],
     survivorExpensePercent: 75,
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: null,
@@ -387,5 +388,25 @@ describe('simulateRetirement', () => {
     expect(at66?.otherIncome).toBe(0)
     expect(at67?.otherIncome).toBe(12_000)
     expect(at67?.portfolioWithdrawal).toBe(28_000)
+  })
+
+  it('adds windfalls to portfolio in matching age year', () => {
+    const { rows } = simulateRetirement(
+      baseInput({
+        retireeCurrentAge: 65,
+        retireeRetirementAge: 65,
+        retireeDeathAge: 68,
+        annualExpenseAtRetirementStart: 0,
+        currentSavings: 100_000,
+        portfolioReturn: 0,
+        inflationRate: 0,
+        windfalls: [{ title: 'Inheritance', amount: 50_000, startAge: 66 }],
+      }),
+    )
+    const at65 = rows.find((r) => r.retireeAge === 65)
+    const at66 = rows.find((r) => r.retireeAge === 66)
+    expect(at65?.windfall).toBe(0)
+    expect(at66?.windfall).toBe(50_000)
+    expect(at66?.endPortfolioBalance).toBe(150_000)
   })
 })

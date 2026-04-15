@@ -17,6 +17,7 @@ import {
   SS_CLAIM_AGE_MIN,
   SS_CLAIM_AGE_OPTIONS,
   SS_TRUST_FUND_CUT_START_YEAR,
+  type WindfallInput,
 } from '../lib/simulateRetirement'
 
 type Patch<K extends keyof FormState> = Pick<FormState, K>
@@ -222,6 +223,25 @@ export function InputForm({
 }: InputFormProps) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ [key]: value } as Patch<K>)
+  const addWindfall = () =>
+    set('windfalls', [
+      ...form.windfalls,
+      {
+        title: `Windfall ${form.windfalls.length + 1}`,
+        amount: 0,
+        startAge: form.retireeRetirementAge,
+      },
+    ])
+  const updateWindfall = (idx: number, patch: Partial<WindfallInput>) =>
+    set(
+      'windfalls',
+      form.windfalls.map((w, i) => (i === idx ? { ...w, ...patch } : w)),
+    )
+  const removeWindfall = (idx: number) =>
+    set(
+      'windfalls',
+      form.windfalls.filter((_, i) => i !== idx),
+    )
 
   return (
     <form className="text-left" onSubmit={(e) => e.preventDefault()}>
@@ -356,6 +376,105 @@ export function InputForm({
               />
             ) : null}
           </div>
+        </section>
+
+        <section className="border-b border-indigo-100/90 px-3 py-3 dark:border-indigo-900/40">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className={sectionTitle}>Windfalls</h3>
+            <button
+              type="button"
+              onClick={addWindfall}
+              className="rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
+            >
+              Add windfall
+            </button>
+          </div>
+          <p className="mb-2 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            One-time future amounts (cash or assets) that are invested into the portfolio in that
+            year.
+          </p>
+          {fieldError(validationIssues, 'windfalls') ? (
+            <p className="mb-2 text-[11px] text-red-600 dark:text-red-400" role="alert">
+              {fieldError(validationIssues, 'windfalls')}
+            </p>
+          ) : null}
+          {form.windfalls.length === 0 ? (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">No windfalls added.</p>
+          ) : (
+            <div className="space-y-2">
+              {form.windfalls.map((w, idx) => (
+                <div
+                  key={`windfall-${idx}`}
+                  className="rounded-lg border border-indigo-100/80 p-2 dark:border-indigo-800/50"
+                >
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end">
+                    <div className="sm:col-span-5">
+                      <label
+                        htmlFor={`windfall-title-${idx}`}
+                        className="mb-1 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Title
+                      </label>
+                      <input
+                        id={`windfall-title-${idx}`}
+                        type="text"
+                        value={w.title}
+                        onChange={(e) => updateWindfall(idx, { title: e.target.value })}
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label
+                        htmlFor={`windfall-amount-${idx}`}
+                        className="mb-1 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Amount ($)
+                      </label>
+                      <input
+                        id={`windfall-amount-${idx}`}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInteger(w.amount)}
+                        onChange={(e) =>
+                          updateWindfall(idx, {
+                            amount: clampInteger(parseMoneyInputToDollars(e.target.value), 0),
+                          })
+                        }
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor={`windfall-age-${idx}`}
+                        className="mb-1 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Age
+                      </label>
+                      <input
+                        id={`windfall-age-${idx}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={18}
+                        max={120}
+                        value={w.startAge}
+                        onChange={(e) => updateWindfall(idx, { startAge: Number(e.target.value) })}
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => removeWindfall(idx)}
+                        className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="border-b border-indigo-100/90 px-3 py-3 dark:border-indigo-900/40">

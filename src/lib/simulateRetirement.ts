@@ -90,6 +90,8 @@ export interface SimulationInput {
   otherAnnualIncome: number
   /** Retiree age when other annual income starts. */
   otherIncomeStartAge: number
+  /** One-time contributions added to portfolio in the matching retiree age year. */
+  windfalls: WindfallInput[]
   /**
    * Annual Social Security COLA as decimal (e.g. 0.026). Applied each year after the first
    * benefit year on each benefit amount (simplified; actual SSA rules vary).
@@ -134,6 +136,7 @@ export interface YearProjection {
   annualExpense: number
   socialSecurity: number
   otherIncome: number
+  windfall: number
   portfolioWithdrawal: number
   /** Balance after return and withdrawal */
   endPortfolioBalance: number
@@ -152,6 +155,12 @@ export interface SimulationResult {
 export interface ValidationIssue {
   field: string
   message: string
+}
+
+export interface WindfallInput {
+  title: string
+  amount: number
+  startAge: number
 }
 
 function lastAliveYear(
@@ -318,6 +327,16 @@ function computeOtherAnnualIncome(
   if (!(retireeAlive || spouseAlive)) return 0
   if (retireeAge < input.otherIncomeStartAge) return 0
   return input.otherAnnualIncome
+}
+
+function computeWindfallForYear(
+  retireeAge: number,
+  retireeAlive: boolean,
+  spouseAlive: boolean,
+  input: SimulationInput,
+): number {
+  if (!(retireeAlive || spouseAlive)) return 0
+  return input.windfalls.reduce((sum, w) => (w.startAge === retireeAge ? sum + w.amount : sum), 0)
 }
 
 interface YearCashFlowResult {
@@ -551,6 +570,27 @@ export function validateSimulationInput(
     })
   }
 
+  input.windfalls.forEach((w, idx) => {
+    if (w.title.trim().length === 0) {
+      issues.push({
+        field: 'windfalls',
+        message: `Windfall #${idx + 1} needs a title.`,
+      })
+    }
+    if (!Number.isFinite(w.amount) || w.amount < 0) {
+      issues.push({
+        field: 'windfalls',
+        message: `Windfall #${idx + 1} amount must be zero or greater.`,
+      })
+    }
+    if (!Number.isFinite(w.startAge) || w.startAge < 18 || w.startAge > 120) {
+      issues.push({
+        field: 'windfalls',
+        message: `Windfall #${idx + 1} age should be between 18 and 120.`,
+      })
+    }
+  })
+
   if (
     input.survivorExpensePercent < 10 ||
     input.survivorExpensePercent > 150
@@ -679,11 +719,18 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       input,
     )
     const totalIncome = socialSecurity + otherIncome
+    const windfall = computeWindfallForYear(
+      retireeAge,
+      retireeAlive,
+      spouseAlive,
+      input,
+    )
+    const balanceWithWindfall = balance + windfall
 
     const householdAlive = retireeAlive || spouseAlive
     const guardrailAdjust = adjustAnnualExpenseForGuardrails(
       input,
-      balance,
+      balanceWithWindfall,
       r,
       annualExpense,
       socialSecurity,
@@ -698,7 +745,8 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
     const flow =
       cadence === 'monthly'
         ? applyMonthlyYearStep(
-            balance,
+            balanceWithWindfall,
+            // Windfalls are invested as they arrive, before this year's return/withdrawals.
             annualExpense,
             totalIncome,
             inRetirementPhase,
@@ -706,7 +754,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
             r,
           )
         : applyAnnualYearStep(
-            balance,
+            balanceWithWindfall,
             annualExpense,
             totalIncome,
             inRetirementPhase,
@@ -725,6 +773,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       annualExpense: flow.annualExpenseReported,
       socialSecurity,
       otherIncome,
+      windfall,
       portfolioWithdrawal: flow.portfolioWithdrawal,
       endPortfolioBalance: flow.endPortfolioBalance,
       shortfall: flow.shortfall,

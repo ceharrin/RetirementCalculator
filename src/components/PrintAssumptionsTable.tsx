@@ -108,6 +108,20 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
   rows.push(assumptionRow('Other annual income', formatMoney(form.otherAnnualIncome)))
   rows.push(assumptionRow('Other income starts (retiree age)', String(form.otherIncomeStartAge)))
 
+  rows.push(sectionHeader('Windfalls'))
+  if (form.windfalls.length === 0) {
+    rows.push(assumptionRow('Windfalls', 'None'))
+  } else {
+    form.windfalls.forEach((w, idx) => {
+      rows.push(
+        assumptionRow(
+          w.title.trim().length > 0 ? w.title : `Windfall ${idx + 1}`,
+          `${formatMoney(w.amount)} at age ${w.startAge}`,
+        ),
+      )
+    })
+  }
+
   if (form.hasSpouse) {
     rows.push(sectionHeader('After first death'))
     rows.push(
