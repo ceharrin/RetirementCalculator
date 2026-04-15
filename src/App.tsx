@@ -170,13 +170,19 @@ export default function App() {
                   <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Portfolio and withdrawals
                   </h2>
-                  <BalanceChart rows={result.rows} />
+                  <BalanceChart
+                    rows={result.rows}
+                    useSpendingGuardrails={result.useSpendingGuardrails}
+                  />
                 </section>
                 <section>
                   <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
                     Year-by-year detail
                   </h2>
-                  <ResultsTable rows={result.rows} />
+                  <ResultsTable
+                    rows={result.rows}
+                    useSpendingGuardrails={result.useSpendingGuardrails}
+                  />
                 </section>
                 <aside
                   className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100 print:border-slate-300 print:bg-slate-50 print:text-slate-800 dark:print:bg-slate-50 dark:print:text-slate-800"

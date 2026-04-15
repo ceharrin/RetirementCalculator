@@ -105,6 +105,8 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
     rows.push(assumptionRow('Spouse claim age', String(form.spouseClaimAge)))
     rows.push(assumptionRow('Spouse annual benefit', formatMoney(form.spouseAnnualSS)))
   }
+  rows.push(assumptionRow('Other annual income', formatMoney(form.otherAnnualIncome)))
+  rows.push(assumptionRow('Other income starts (retiree age)', String(form.otherIncomeStartAge)))
 
   if (form.hasSpouse) {
     rows.push(sectionHeader('After first death'))

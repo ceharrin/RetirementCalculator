@@ -86,6 +86,10 @@ export interface SimulationInput {
   spouseClaimAge: number | null
   retireeAnnualSS: number
   spouseAnnualSS: number | null
+  /** Optional additional nominal household income received each year after start age. */
+  otherAnnualIncome: number
+  /** Retiree age when other annual income starts. */
+  otherIncomeStartAge: number
   /**
    * Annual Social Security COLA as decimal (e.g. 0.026). Applied each year after the first
    * benefit year on each benefit amount (simplified; actual SSA rules vary).
@@ -116,6 +120,9 @@ export interface SimulationInput {
   projectionCadence: ProjectionCadence
 }
 
+/** Per-year guardrail state when `useSpendingGuardrails` is modeled (otherwise `off`). */
+export type GuardrailYearKind = 'off' | 'anchor' | 'hold' | 'increase' | 'decrease'
+
 export interface YearProjection {
   calendarYear: number
   retireeAge: number
@@ -126,15 +133,20 @@ export interface YearProjection {
   yearsSinceRetirement: number | null
   annualExpense: number
   socialSecurity: number
+  otherIncome: number
   portfolioWithdrawal: number
   /** Balance after return and withdrawal */
   endPortfolioBalance: number
   shortfall: boolean
+  /** Guyton–Klinger guardrail role for this year (`off` when not modeled). */
+  guardrailYearKind: GuardrailYearKind
 }
 
 export interface SimulationResult {
   rows: YearProjection[]
   retirementStartYear: number | null
+  /** Echo of input: when true, row `guardrailYearKind` may be non-`off` in retirement. */
+  useSpendingGuardrails: boolean
 }
 
 export interface ValidationIssue {
@@ -211,9 +223,9 @@ function adjustAnnualExpenseForGuardrails(
   inRetirementPhase: boolean,
   householdAlive: boolean,
   initialWithdrawalRate: { current: number | null },
-): number {
+): { annualExpense: number; kind: GuardrailYearKind } {
   if (!input.useSpendingGuardrails || !inRetirementPhase || !householdAlive) {
-    return policyAnnualExpense
+    return { annualExpense: policyAnnualExpense, kind: 'off' }
   }
 
   const afterReturn = balanceStartOfYear * (1 + portfolioReturn)
@@ -224,26 +236,34 @@ function adjustAnnualExpenseForGuardrails(
       const rate = withdrawalRate(plannedWithdrawal, afterReturn)
       if (Number.isFinite(rate) && rate > 0) {
         initialWithdrawalRate.current = rate
+        return { annualExpense: policyAnnualExpense, kind: 'anchor' }
       }
     }
-    return policyAnnualExpense
+    return { annualExpense: policyAnnualExpense, kind: 'hold' }
   }
 
-  if (afterReturn <= 0) return policyAnnualExpense
+  if (afterReturn <= 0) {
+    return { annualExpense: policyAnnualExpense, kind: 'hold' }
+  }
 
   const currentRate = withdrawalRate(plannedWithdrawal, afterReturn)
-  if (!Number.isFinite(currentRate)) return policyAnnualExpense
+  if (!Number.isFinite(currentRate)) {
+    return { annualExpense: policyAnnualExpense, kind: 'hold' }
+  }
 
   const decision = guardrailDecision(
     currentRate,
     initialWithdrawalRate.current,
     DEFAULT_GUARDRAIL_BAND,
   )
-  return adjustSpendingForDecision(
+  const annualExpense = adjustSpendingForDecision(
     policyAnnualExpense,
     decision,
     DEFAULT_GUARDRAIL_SPENDING_STEP,
   )
+  const kind: GuardrailYearKind =
+    decision === 'increase' ? 'increase' : decision === 'decrease' ? 'decrease' : 'hold'
+  return { annualExpense, kind }
 }
 
 function computeHouseholdSS(
@@ -289,6 +309,17 @@ function computeHouseholdSS(
   return 0
 }
 
+function computeOtherAnnualIncome(
+  retireeAge: number,
+  retireeAlive: boolean,
+  spouseAlive: boolean,
+  input: SimulationInput,
+): number {
+  if (!(retireeAlive || spouseAlive)) return 0
+  if (retireeAge < input.otherIncomeStartAge) return 0
+  return input.otherAnnualIncome
+}
+
 interface YearCashFlowResult {
   endPortfolioBalance: number
   portfolioWithdrawal: number
@@ -300,14 +331,14 @@ interface YearCashFlowResult {
 function applyAnnualYearStep(
   balance: number,
   annualExpense: number,
-  socialSecurity: number,
+  totalIncome: number,
   inRetirementPhase: boolean,
   householdAlive: boolean,
   portfolioReturn: number,
 ): YearCashFlowResult {
   const afterReturn = balance * (1 + portfolioReturn)
   if (inRetirementPhase && householdAlive) {
-    let withdrawal = Math.max(0, annualExpense - socialSecurity)
+    let withdrawal = Math.max(0, annualExpense - totalIncome)
     let shortfall = false
     if (withdrawal > afterReturn) {
       shortfall = true
@@ -321,7 +352,7 @@ function applyAnnualYearStep(
     }
   }
   return {
-    endPortfolioBalance: Math.max(0, afterReturn + socialSecurity),
+    endPortfolioBalance: Math.max(0, afterReturn + totalIncome),
     portfolioWithdrawal: 0,
     annualExpenseReported: 0,
     shortfall: false,
@@ -334,7 +365,7 @@ function applyAnnualYearStep(
 function applyMonthlyYearStep(
   balance: number,
   annualExpense: number,
-  socialSecurity: number,
+  totalIncome: number,
   inRetirementPhase: boolean,
   householdAlive: boolean,
   portfolioReturn: number,
@@ -346,10 +377,10 @@ function applyMonthlyYearStep(
 
   if (inRetirementPhase && householdAlive) {
     const monthlyExpense = annualExpense / 12
-    const monthlySs = socialSecurity / 12
+    const monthlyIncome = totalIncome / 12
     for (let m = 0; m < 12; m++) {
       const afterReturn = bal * (1 + rM)
-      let withdrawal = Math.max(0, monthlyExpense - monthlySs)
+      let withdrawal = Math.max(0, monthlyExpense - monthlyIncome)
       if (withdrawal > afterReturn) {
         shortfall = true
         withdrawal = afterReturn
@@ -365,10 +396,10 @@ function applyMonthlyYearStep(
     }
   }
 
-  const monthlySs = socialSecurity / 12
+  const monthlyIncome = totalIncome / 12
   for (let m = 0; m < 12; m++) {
     bal = bal * (1 + rM)
-    bal = Math.max(0, bal + monthlySs)
+    bal = Math.max(0, bal + monthlyIncome)
   }
   return {
     endPortfolioBalance: bal,
@@ -509,6 +540,17 @@ export function validateSimulationInput(
     issues.push({ field: 'socialSecurity', message: 'Social Security amounts cannot be negative.' })
   }
 
+  if (input.otherAnnualIncome < 0) {
+    issues.push({ field: 'otherAnnualIncome', message: 'Other annual income cannot be negative.' })
+  }
+
+  if (input.otherIncomeStartAge < 18 || input.otherIncomeStartAge > 120) {
+    issues.push({
+      field: 'otherIncomeStartAge',
+      message: 'Other income start age should be between 18 and 120.',
+    })
+  }
+
   if (
     input.survivorExpensePercent < 10 ||
     input.survivorExpensePercent > 150
@@ -630,9 +672,16 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
         spouseAlive,
         input,
       ) * trustFundSsBenefitMultiplier(y, input)
+    const otherIncome = computeOtherAnnualIncome(
+      retireeAge,
+      retireeAlive,
+      spouseAlive,
+      input,
+    )
+    const totalIncome = socialSecurity + otherIncome
 
     const householdAlive = retireeAlive || spouseAlive
-    annualExpense = adjustAnnualExpenseForGuardrails(
+    const guardrailAdjust = adjustAnnualExpenseForGuardrails(
       input,
       balance,
       r,
@@ -642,6 +691,8 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       householdAlive,
       initialWithdrawalRate,
     )
+    annualExpense = guardrailAdjust.annualExpense
+    const guardrailYearKind = guardrailAdjust.kind
 
     const cadence = input.projectionCadence
     const flow =
@@ -649,7 +700,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
         ? applyMonthlyYearStep(
             balance,
             annualExpense,
-            socialSecurity,
+            totalIncome,
             inRetirementPhase,
             householdAlive,
             r,
@@ -657,7 +708,7 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
         : applyAnnualYearStep(
             balance,
             annualExpense,
-            socialSecurity,
+            totalIncome,
             inRetirementPhase,
             householdAlive,
             r,
@@ -673,13 +724,15 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       yearsSinceRetirement,
       annualExpense: flow.annualExpenseReported,
       socialSecurity,
+      otherIncome,
       portfolioWithdrawal: flow.portfolioWithdrawal,
       endPortfolioBalance: flow.endPortfolioBalance,
       shortfall: flow.shortfall,
+      guardrailYearKind,
     })
 
     balance = flow.endPortfolioBalance
   }
 
-  return { rows, retirementStartYear }
+  return { rows, retirementStartYear, useSpendingGuardrails: input.useSpendingGuardrails }
 }

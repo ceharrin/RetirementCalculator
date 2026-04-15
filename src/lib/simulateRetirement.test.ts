@@ -23,6 +23,8 @@ function baseInput(over: Partial<SimulationInput> = {}): SimulationInput {
     spouseClaimAge: null,
     retireeAnnualSS: 0,
     spouseAnnualSS: null,
+    otherAnnualIncome: 0,
+    otherIncomeStartAge: 67,
     survivorExpensePercent: 75,
     survivorSSMode: 'higherOfTwo',
     customSurvivorAnnualSS: null,
@@ -233,8 +235,14 @@ describe('simulateRetirement', () => {
     const on = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: true }))
     const age66off = off.rows.find((r) => r.retireeAge === 66)
     const age66on = on.rows.find((r) => r.retireeAge === 66)
+    const age65on = on.rows.find((r) => r.retireeAge === 65)
     expect(age66off?.annualExpense).toBe(50_000)
     expect(age66on?.annualExpense).toBe(45_000)
+    expect(off.useSpendingGuardrails).toBe(false)
+    expect(on.useSpendingGuardrails).toBe(true)
+    expect(age65on?.guardrailYearKind).toBe('anchor')
+    expect(age66on?.guardrailYearKind).toBe('decrease')
+    expect(age66off?.guardrailYearKind).toBe('off')
   })
 
   it('guardrails: increases nominal spending when planned withdrawal rate falls below the band', () => {
@@ -254,8 +262,11 @@ describe('simulateRetirement', () => {
     const on = simulateRetirement(baseInput({ ...common, useSpendingGuardrails: true }))
     const age66off = off.rows.find((r) => r.retireeAge === 66)
     const age66on = on.rows.find((r) => r.retireeAge === 66)
+    const age65on = on.rows.find((r) => r.retireeAge === 65)
     expect(age66off?.annualExpense).toBe(40_000)
     expect(age66on?.annualExpense).toBe(44_000)
+    expect(age65on?.guardrailYearKind).toBe('anchor')
+    expect(age66on?.guardrailYearKind).toBe('increase')
   })
 
   it('applies real spending decline on top of inflation after start age', () => {
@@ -354,5 +365,27 @@ describe('simulateRetirement', () => {
     )
     expect(rows.every((r) => Number.isFinite(r.endPortfolioBalance))).toBe(true)
     expect(rows.some((r) => r.portfolioWithdrawal > 0)).toBe(true)
+  })
+
+  it('starts other annual income at selected retiree age', () => {
+    const { rows } = simulateRetirement(
+      baseInput({
+        retireeCurrentAge: 65,
+        retireeRetirementAge: 65,
+        retireeDeathAge: 70,
+        annualExpenseAtRetirementStart: 40_000,
+        otherAnnualIncome: 12_000,
+        otherIncomeStartAge: 67,
+        currentSavings: 200_000,
+        portfolioReturn: 0,
+        inflationRate: 0,
+      }),
+    )
+
+    const at66 = rows.find((r) => r.retireeAge === 66)
+    const at67 = rows.find((r) => r.retireeAge === 67)
+    expect(at66?.otherIncome).toBe(0)
+    expect(at67?.otherIncome).toBe(12_000)
+    expect(at67?.portfolioWithdrawal).toBe(28_000)
   })
 })

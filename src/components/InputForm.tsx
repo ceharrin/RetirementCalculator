@@ -531,6 +531,25 @@ export function InputForm({
                 />
               </>
             ) : null}
+            <MoneyField
+              id="otherAnnualIncome"
+              label="Other annual income ($)"
+              value={form.otherAnnualIncome}
+              onChange={(n) => set('otherAnnualIncome', n)}
+              min={0}
+              error={fieldError(validationIssues, 'otherAnnualIncome')}
+              hint="Additional household income beyond Social Security."
+            />
+            <NumField
+              id="otherIncomeStartAge"
+              label="Other income starts (retiree age)"
+              value={form.otherIncomeStartAge}
+              onChange={(n) => set('otherIncomeStartAge', n)}
+              min={18}
+              max={120}
+              error={fieldError(validationIssues, 'otherIncomeStartAge')}
+              hint="If earlier than current age, income starts immediately."
+            />
           </div>
         </section>
 
