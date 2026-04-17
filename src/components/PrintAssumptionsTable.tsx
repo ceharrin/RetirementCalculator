@@ -58,6 +58,30 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
         : 'Annual (one step per year)',
     ),
   )
+  rows.push(
+    assumptionRow(
+      'Projection mode',
+      form.projectionMode === 'monte_carlo'
+        ? `Monte Carlo bootstrap (${form.monteCarloTrials} trials)`
+        : 'Deterministic (fixed annual return and inflation)',
+    ),
+  )
+  if (form.projectionMode === 'monte_carlo') {
+    rows.push(
+      assumptionRow(
+        'Monte Carlo seed',
+        form.monteCarloSeed.trim() === ''
+          ? 'Automatic (see on-screen summary after run)'
+          : form.monteCarloSeed.trim(),
+      ),
+    )
+    rows.push(
+      assumptionRow(
+        'Historical bootstrap',
+        'US CPI calendar-year inflation + S&P 500 total return (1970–2023), paired by year, sampled with replacement each projection year',
+      ),
+    )
+  }
   rows.push(assumptionRow('Retiree current age', String(form.retireeCurrentAge)))
   rows.push(assumptionRow('Include spouse', form.hasSpouse ? 'Yes' : 'No'))
   if (form.hasSpouse) {
@@ -79,9 +103,21 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
   )
   rows.push(assumptionRow('Current retirement savings', formatMoney(form.currentSavings)))
   rows.push(
-    assumptionRow('Annual portfolio return', formatPercentWhole(form.portfolioReturnPercent)),
+    assumptionRow(
+      'Annual portfolio return',
+      form.projectionMode === 'monte_carlo'
+        ? 'Not used (Monte Carlo draws historical returns each year)'
+        : formatPercentWhole(form.portfolioReturnPercent),
+    ),
   )
-  rows.push(assumptionRow('Annual inflation', formatPercentWhole(form.inflationPercent)))
+  rows.push(
+    assumptionRow(
+      'Annual inflation',
+      form.projectionMode === 'monte_carlo'
+        ? 'Not used (Monte Carlo draws historical inflation each retirement year)'
+        : formatPercentWhole(form.inflationPercent),
+    ),
+  )
   rows.push(
     assumptionRow(
       'Guyton–Klinger spending guardrails',
@@ -150,9 +186,9 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
   }
 
   return (
-    <div className="print-only mb-5">
+    <div className="print-only print-split-table-wrap mb-5">
       <h3 className="mb-2 text-sm font-bold text-slate-900">Assumed values</h3>
-      <table className="w-full border-collapse border border-slate-300 text-sm">
+      <table className="print-split-table w-full border-collapse border border-slate-300 text-sm">
         <tbody>{rows}</tbody>
       </table>
     </div>

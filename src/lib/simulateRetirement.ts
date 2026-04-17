@@ -57,6 +57,12 @@ export type SurvivorSSMode = 'higherOfTwo' | 'custom'
 /** One portfolio step per year vs twelve (monthly return and cash flows within the year). */
 export type ProjectionCadence = 'annual' | 'monthly'
 
+/** Nominal portfolio return and CPI-style inflation for one projection calendar year. */
+export interface AnnualMarketRates {
+  portfolioReturn: number
+  inflationRate: number
+}
+
 /**
  * Equivalent per-month rate so twelve compound steps match one annual step:
  * `(1 + r_m)^12 = 1 + r_annual`.
@@ -657,30 +663,30 @@ export function validateSimulationInput(
   return issues
 }
 
-export function simulateRetirement(input: SimulationInput): SimulationResult {
-  const issues = validateSimulationInput(input)
-  if (issues.length > 0) {
-    throw new Error(issues.map((i) => i.message).join(' '))
-  }
-
-  const endYear = input.hasSpouse && input.spouseCurrentAge != null && input.spouseDeathAge != null
-    ? Math.max(
-        lastAliveYear(
+/** End calendar year and first retirement calendar year (null if never reached within horizon). */
+export function computeSimulationHorizon(input: SimulationInput): {
+  endYear: number
+  retirementStartYear: number | null
+} {
+  const endYear =
+    input.hasSpouse && input.spouseCurrentAge != null && input.spouseDeathAge != null
+      ? Math.max(
+          lastAliveYear(
+            input.startYear,
+            input.retireeCurrentAge,
+            input.retireeDeathAge,
+          ),
+          lastAliveYear(
+            input.startYear,
+            input.spouseCurrentAge,
+            input.spouseDeathAge,
+          ),
+        )
+      : lastAliveYear(
           input.startYear,
           input.retireeCurrentAge,
           input.retireeDeathAge,
-        ),
-        lastAliveYear(
-          input.startYear,
-          input.spouseCurrentAge,
-          input.spouseDeathAge,
-        ),
-      )
-    : lastAliveYear(
-        input.startYear,
-        input.retireeCurrentAge,
-        input.retireeDeathAge,
-      )
+        )
 
   let retirementStartYear: number | null = null
   for (let y = input.startYear; y <= endYear; y++) {
@@ -691,10 +697,34 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
     }
   }
 
+  return { endYear, retirementStartYear }
+}
+
+/**
+ * Same rules as `simulateRetirement`, but each calendar year uses its own nominal return and
+ * inflation from `annualRates` (length must equal horizon year count). Inflation compounds
+ * nominal retirement spending year-by-year using each retirement year’s sampled rate.
+ */
+export function simulateRetirementWithAnnualRates(
+  input: SimulationInput,
+  annualRates: AnnualMarketRates[],
+): SimulationResult {
+  const issues = validateSimulationInput(input)
+  if (issues.length > 0) {
+    throw new Error(issues.map((i) => i.message).join(' '))
+  }
+
+  const { endYear, retirementStartYear } = computeSimulationHorizon(input)
+  const horizonYears = endYear - input.startYear + 1
+  if (annualRates.length !== horizonYears) {
+    throw new Error(
+      `annualRates length ${annualRates.length} does not match projection horizon ${horizonYears} years.`,
+    )
+  }
+
   const rows: YearProjection[] = []
   let balance = input.currentSavings
-  const r = input.portfolioReturn
-  const inf = input.inflationRate
+  let nominalSpendingInflationMultiple = 1
   const initialWithdrawalRate: { current: number | null } = { current: null }
 
   for (let y = input.startYear; y <= endYear; y++) {
@@ -719,10 +749,13 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
       yearsSinceRetirement = y - retirementStartYear
     }
 
+    const yearOffset = y - input.startYear
+    const { portfolioReturn: r, inflationRate: inf } = annualRates[yearOffset]
+
     let annualExpense = 0
     if (inRetirementPhase && yearsSinceRetirement != null) {
       const jointExpenseNominal =
-        input.annualExpenseAtRetirementStart * (1 + inf) ** yearsSinceRetirement
+        input.annualExpenseAtRetirementStart * nominalSpendingInflationMultiple
 
       const ageDecline = ageForSpendingDecline(
         retireeAlive,
@@ -831,7 +864,21 @@ export function simulateRetirement(input: SimulationInput): SimulationResult {
     })
 
     balance = flow.endPortfolioBalance
+
+    if (inRetirementPhase) {
+      nominalSpendingInflationMultiple *= 1 + inf
+    }
   }
 
   return { rows, retirementStartYear, useSpendingGuardrails: input.useSpendingGuardrails }
+}
+
+export function simulateRetirement(input: SimulationInput): SimulationResult {
+  const { endYear } = computeSimulationHorizon(input)
+  const horizonYears = endYear - input.startYear + 1
+  const annualRates: AnnualMarketRates[] = Array.from({ length: horizonYears }, () => ({
+    portfolioReturn: input.portfolioReturn,
+    inflationRate: input.inflationRate,
+  }))
+  return simulateRetirementWithAnnualRates(input, annualRates)
 }

@@ -20,8 +20,8 @@ export function ResultsTable({ rows }: ResultsTableProps) {
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-indigo-200/70 bg-white shadow-sm shadow-indigo-100/20 dark:border-indigo-800/50 dark:bg-slate-900 dark:shadow-indigo-950/20 print:rounded-none print:border-slate-300 print:shadow-none">
-      <table className="min-w-full divide-y divide-indigo-100 text-sm dark:divide-indigo-900/40 print:text-[10px] print:leading-tight">
+      <div className="print-split-table-wrap overflow-x-auto rounded-xl border border-indigo-200/70 bg-white shadow-sm shadow-indigo-100/20 dark:border-indigo-800/50 dark:bg-slate-900 dark:shadow-indigo-950/20 print:overflow-visible print:rounded-none print:border-slate-300 print:shadow-none">
+      <table className="print-split-table min-w-full divide-y divide-indigo-100 text-sm dark:divide-indigo-900/40 print:text-[10px] print:leading-tight">
         <thead className="bg-indigo-50/95 dark:bg-indigo-950/45">
           <tr>
             <th scope="col" className="px-3 py-3 text-center font-bold text-indigo-950 dark:text-indigo-100 print:px-1 print:py-1 print:font-semibold">

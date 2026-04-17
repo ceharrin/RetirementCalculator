@@ -2,8 +2,12 @@ import { useCallback, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { BalanceChart } from './components/BalanceChart'
 import { InputForm } from './components/InputForm'
+import { MonteCarloBalanceChart } from './components/MonteCarloBalanceChart'
+import { MonteCarloPlanOutcomeGraphic } from './components/MonteCarloPlanOutcomeGraphic'
+import { MonteCarloResultsTable } from './components/MonteCarloResultsTable'
 import { PrintAssumptionsTable } from './components/PrintAssumptionsTable'
 import { ResultsTable } from './components/ResultsTable'
+import { runMonteCarloBootstrap, type MonteCarloResult } from './lib/monteCarloBootstrap'
 import {
   clampSsClaimAge,
   DEFAULT_INFLATION_RATE,
@@ -16,7 +20,12 @@ import {
   validateSimulationInput,
   type SimulationResult,
 } from './lib/simulateRetirement'
-import { defaultFormState, formStateToSimulationInput, type FormState } from './types/form'
+import {
+  defaultFormState,
+  formStateToSimulationInput,
+  validateMonteCarloControls,
+  type FormState,
+} from './types/form'
 
 const PLANNING_YEAR = new Date().getFullYear()
 const initialForm = defaultFormState(PLANNING_YEAR)
@@ -118,33 +127,46 @@ export default function App() {
       return next
     })
   }, [])
-  const [result, setResult] = useState<SimulationResult | null>(() => {
+  const [deterministicResult, setDeterministicResult] = useState<SimulationResult | null>(() => {
     const input = formStateToSimulationInput(initialForm)
     return validateSimulationInput(input).length === 0
       ? simulateRetirement(input)
       : null
   })
+  const [monteCarloResult, setMonteCarloResult] = useState<MonteCarloResult | null>(null)
   const [guardrailExampleYears, setGuardrailExampleYears] = useState<number[]>([])
 
   const simulationInput = useMemo(() => formStateToSimulationInput(form), [form])
   const validationIssues = useMemo(
-    () => validateSimulationInput(simulationInput),
-    [simulationInput],
+    () => [...validateSimulationInput(simulationInput), ...validateMonteCarloControls(form)],
+    [simulationInput, form],
   )
   const canRun = validationIssues.length === 0
 
   const runProjection = useCallback(() => {
     if (!canRun) return
     setAssumptionsForReport({ ...form })
-    const next = simulateRetirement(simulationInput)
-    setResult(next)
-    setGuardrailExampleYears(
-      form.useSpendingGuardrails ? pickGuardrailExampleYears(next.rows) : [],
-    )
+    if (form.projectionMode === 'monte_carlo') {
+      const seedStr = form.monteCarloSeed.trim()
+      const seed = seedStr === '' ? undefined : parseInt(seedStr, 10)
+      const mc = runMonteCarloBootstrap(simulationInput, {
+        trialCount: form.monteCarloTrials,
+        seed,
+      })
+      setMonteCarloResult(mc)
+      setGuardrailExampleYears([])
+    } else {
+      const next = simulateRetirement(simulationInput)
+      setDeterministicResult(next)
+      setMonteCarloResult(null)
+      setGuardrailExampleYears(
+        form.useSpendingGuardrails ? pickGuardrailExampleYears(next.rows) : [],
+      )
+    }
   }, [canRun, form, simulationInput])
 
   const printOrSavePdf = useCallback(() => {
-    if (!result) return
+    if (!deterministicResult && !monteCarloResult) return
     const now = new Date()
     flushSync(() => {
       setPrintReportMeta({
@@ -153,7 +175,11 @@ export default function App() {
       })
     })
     window.print()
-  }, [result])
+  }, [deterministicResult, monteCarloResult])
+
+  const hasDeterministicView = form.projectionMode === 'deterministic' && deterministicResult
+  const hasMonteCarloView = form.projectionMode === 'monte_carlo' && monteCarloResult
+  const hasAnyResult = hasDeterministicView || hasMonteCarloView
 
   return (
     <div className="min-h-svh bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-50/45 text-slate-900 dark:from-slate-950 dark:via-indigo-950/30 dark:to-violet-950/25 dark:text-slate-50">
@@ -180,7 +206,9 @@ export default function App() {
                 setForm((f) => applyHistoricalDefaults(f))
               }
               validationIssues={validationIssues}
-              projectionRows={result?.rows}
+              projectionRows={
+                form.projectionMode === 'deterministic' ? deterministicResult?.rows : undefined
+              }
               guardrailExampleYears={form.useSpendingGuardrails ? guardrailExampleYears : []}
             />
             <div className="mt-6">
@@ -201,7 +229,7 @@ export default function App() {
           </div>
 
           <div className="lg:col-span-3 print:w-full print:max-w-none">
-            {result ? (
+            {hasAnyResult ? (
               <div className="flex flex-col gap-8 print:gap-6">
                 <div className="print-only mb-4 border-b border-slate-300 pb-3">
                   <p className="text-lg font-semibold text-slate-900">Retirement projection report</p>
@@ -227,23 +255,71 @@ export default function App() {
                     Opens your browser print dialog—choose &quot;Save as PDF&quot; to download.
                   </p>
                 </div>
-                <section className="print:order-1">
-                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
-                    Portfolio and withdrawals
-                  </h2>
-                  <BalanceChart
-                    rows={result.rows}
-                    useSpendingGuardrails={result.useSpendingGuardrails}
-                  />
-                </section>
-                <section className="print:order-3">
-                  <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
-                    Year-by-year detail
-                  </h2>
-                  <ResultsTable
-                    rows={result.rows}
-                  />
-                </section>
+                {hasDeterministicView ? (
+                  <section className="print:order-1">
+                    <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
+                      Portfolio and withdrawals
+                    </h2>
+                    <BalanceChart
+                      rows={deterministicResult.rows}
+                      useSpendingGuardrails={deterministicResult.useSpendingGuardrails}
+                    />
+                  </section>
+                ) : null}
+                {hasMonteCarloView ? (
+                  <section className="print:order-1">
+                    <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
+                      Monte Carlo: portfolio and withdrawals (p10 / p50 / p90)
+                    </h2>
+                    <MonteCarloPlanOutcomeGraphic result={monteCarloResult} />
+                    <div className="no-print mb-3 rounded-lg border border-violet-200/90 bg-violet-50/80 px-3 py-2 text-xs text-violet-950 dark:border-violet-800/50 dark:bg-violet-950/35 dark:text-violet-100">
+                      <p>
+                        <span className="font-semibold">{monteCarloResult.trialCount} trials</span>, seed{' '}
+                        <span className="font-mono tabular-nums">{monteCarloResult.seedUsed}</span>.
+                        Any-year shortfall in{' '}
+                        <span className="font-semibold">
+                          {(monteCarloResult.everShortfallFraction * 100).toFixed(1)}%
+                        </span>{' '}
+                        of trials. Final-year end balance p10 / p50 / p90:{' '}
+                        {monteCarloResult.finalEndBalanceP10.toLocaleString(undefined, {
+                          style: 'currency',
+                          currency: 'USD',
+                          maximumFractionDigits: 0,
+                        })}{' '}
+                        /{' '}
+                        {monteCarloResult.finalEndBalanceP50.toLocaleString(undefined, {
+                          style: 'currency',
+                          currency: 'USD',
+                          maximumFractionDigits: 0,
+                        })}{' '}
+                        /{' '}
+                        {monteCarloResult.finalEndBalanceP90.toLocaleString(undefined, {
+                          style: 'currency',
+                          currency: 'USD',
+                          maximumFractionDigits: 0,
+                        })}
+                        .
+                      </p>
+                    </div>
+                    <MonteCarloBalanceChart rows={monteCarloResult.rows} />
+                  </section>
+                ) : null}
+                {hasDeterministicView ? (
+                  <section className="print:order-3">
+                    <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
+                      Year-by-year detail
+                    </h2>
+                    <ResultsTable rows={deterministicResult.rows} />
+                  </section>
+                ) : null}
+                {hasMonteCarloView ? (
+                  <section className="print:order-3">
+                    <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">
+                      Year-by-year percentiles
+                    </h2>
+                    <MonteCarloResultsTable rows={monteCarloResult.rows} />
+                  </section>
+                ) : null}
                 <aside
                   className="rounded-lg border border-indigo-200/90 bg-indigo-50/80 p-4 text-sm text-indigo-950 dark:border-indigo-700/60 dark:bg-indigo-950/35 dark:text-indigo-100 print:order-4 print:border-slate-300 print:bg-slate-50 print:text-slate-800 dark:print:bg-slate-50 dark:print:text-slate-800"
                   role="note"
@@ -253,13 +329,29 @@ export default function App() {
                   is modeled with simplified rules and your own benefit estimates, not official SSA
                   calculations. Inflation and investment returns are unknown; any rate you enter is
                   an assumption, not a prediction.
+                  {hasMonteCarloView ? (
+                    <>
+                      {' '}
+                      Monte Carlo uses bootstrapped historical US CPI and S&P 500 annual pairs, not
+                      a forecast of your portfolio or inflation path.
+                    </>
+                  ) : null}
                 </aside>
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-indigo-300/80 bg-white/70 p-10 text-center text-slate-600 shadow-inner shadow-indigo-50/80 dark:border-indigo-600/50 dark:bg-slate-900/50 dark:text-slate-400 dark:shadow-indigo-950/20">
                 <p className="text-base">
-                  Enter assumptions on the left, then click <strong>Run projection</strong> to see
-                  balances, withdrawals, and a yearly table.
+                  {form.projectionMode === 'monte_carlo' && !monteCarloResult ? (
+                    <>
+                      Choose Monte Carlo settings on the left, then click{' '}
+                      <strong>Run projection</strong> to see percentile bands across trials.
+                    </>
+                  ) : (
+                    <>
+                      Enter assumptions on the left, then click <strong>Run projection</strong> to
+                      see balances, withdrawals, and a yearly table.
+                    </>
+                  )}
                 </p>
               </div>
             )}

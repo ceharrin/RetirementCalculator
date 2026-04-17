@@ -8,7 +8,10 @@ import {
   type SurvivorSSMode,
   type OneTimeExpenseInput,
   type WindfallInput,
+  type ValidationIssue,
 } from '../lib/simulateRetirement'
+
+export type ProjectionMode = 'deterministic' | 'monte_carlo'
 
 /** Form-friendly mirror of simulation input; rates as whole percents (e.g. 3 = 3%). */
 export interface FormState {
@@ -48,6 +51,12 @@ export interface FormState {
   projectionCadence: ProjectionCadence
   /** Guyton–Klinger-style optional adjustment to nominal retirement spending (see simulation). */
   useSpendingGuardrails: boolean
+  /** Deterministic fixed rates vs Monte Carlo bootstrap of historical return/inflation pairs. */
+  projectionMode: ProjectionMode
+  /** Number of Monte Carlo trials (when projectionMode is monte_carlo). */
+  monteCarloTrials: number
+  /** Integer seed for reproducible Monte Carlo; empty string uses an automatic seed each run. */
+  monteCarloSeed: string
 }
 
 export function defaultFormState(nowYear: number): FormState {
@@ -80,7 +89,37 @@ export function defaultFormState(nowYear: number): FormState {
     customSurvivorAnnualSS: 30_000,
     projectionCadence: 'annual',
     useSpendingGuardrails: false,
+    projectionMode: 'deterministic',
+    monteCarloTrials: 500,
+    monteCarloSeed: '',
   }
+}
+
+/** Extra validation for Monte Carlo controls (append to `validateSimulationInput` issues). */
+export function validateMonteCarloControls(form: FormState): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (form.projectionMode !== 'monte_carlo') return issues
+
+  if (
+    !Number.isFinite(form.monteCarloTrials) ||
+    form.monteCarloTrials < 50 ||
+    form.monteCarloTrials > 5000
+  ) {
+    issues.push({
+      field: 'monteCarloTrials',
+      message: 'Monte Carlo trials should be between 50 and 5,000.',
+    })
+  }
+
+  const s = form.monteCarloSeed.trim()
+  if (s !== '' && !/^-?\d+$/.test(s)) {
+    issues.push({
+      field: 'monteCarloSeed',
+      message: 'Optional seed must be a whole number (or leave blank for automatic).',
+    })
+  }
+
+  return issues
 }
 
 export function formStateToSimulationInput(form: FormState): SimulationInput {

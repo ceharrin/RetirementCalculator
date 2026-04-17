@@ -492,8 +492,13 @@ export function InputForm({
               min={-20}
               max={30}
               step={0.1}
+              disabled={form.projectionMode === 'monte_carlo'}
               error={fieldError(validationIssues, 'portfolioReturn')}
-              hint="Nominal, same each year."
+              hint={
+                form.projectionMode === 'monte_carlo'
+                  ? 'Not used in Monte Carlo mode (each year samples historical return).'
+                  : 'Nominal, same each year.'
+              }
             />
             <NumField
               id="inflationPercent"
@@ -503,9 +508,85 @@ export function InputForm({
               min={-10}
               max={25}
               step={0.1}
+              disabled={form.projectionMode === 'monte_carlo'}
               error={fieldError(validationIssues, 'inflationRate')}
-              hint="Applied to expenses every year; decline is real, on top of this."
+              hint={
+                form.projectionMode === 'monte_carlo'
+                  ? 'Not used in Monte Carlo mode (each retirement year samples historical inflation).'
+                  : 'Applied to expenses every year; decline is real, on top of this.'
+              }
             />
+            <div className="flex h-full min-h-0 min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-3">
+              <div className={labelSlotClass}>
+                <span className="block w-full">Projection method</span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-800 dark:text-slate-200">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="projectionMode"
+                    className="size-3.5 shrink-0 border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
+                    checked={form.projectionMode === 'deterministic'}
+                    onChange={() => set('projectionMode', 'deterministic')}
+                  />
+                  Deterministic (fixed return &amp; inflation)
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="projectionMode"
+                    className="size-3.5 shrink-0 border-indigo-400 text-indigo-600 focus:ring-violet-500 dark:border-indigo-500"
+                    checked={form.projectionMode === 'monte_carlo'}
+                    onChange={() => set('projectionMode', 'monte_carlo')}
+                  />
+                  Monte Carlo (historical bootstrap)
+                </label>
+              </div>
+              {form.projectionMode === 'monte_carlo' ? (
+                <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <NumField
+                    id="monteCarloTrials"
+                    label="Monte Carlo trials"
+                    value={form.monteCarloTrials}
+                    onChange={(n) => set('monteCarloTrials', n)}
+                    min={50}
+                    max={5000}
+                    error={fieldError(validationIssues, 'monteCarloTrials')}
+                    hint="Each trial resamples annual US CPI + S&P 500 pairs with replacement."
+                  />
+                  <div className="flex h-full min-h-0 min-w-0 flex-col gap-1">
+                    <div className={labelSlotClass}>
+                      <label htmlFor="monteCarloSeed" className="block w-full">
+                        Random seed (optional)
+                      </label>
+                    </div>
+                    <input
+                      id="monteCarloSeed"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className={inputClass}
+                      value={form.monteCarloSeed}
+                      onChange={(e) => set('monteCarloSeed', e.target.value)}
+                      placeholder="Blank = automatic"
+                    />
+                    {fieldError(validationIssues, 'monteCarloSeed') ? (
+                      <p
+                        id="monteCarloSeed-err"
+                        className="text-xs font-medium text-red-600 dark:text-red-400"
+                      >
+                        {fieldError(validationIssues, 'monteCarloSeed')}
+                      </p>
+                    ) : null}
+                    <div className={hintSlotClass}>
+                      <p className="text-slate-500 dark:text-slate-400">
+                        Same integer seed reproduces the same sequence for a given trial count.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 

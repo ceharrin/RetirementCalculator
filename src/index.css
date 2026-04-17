@@ -37,6 +37,36 @@ body {
   .print-only {
     display: block !important;
   }
+
+  /**
+   * Let wide year-by-year tables continue across pages between rows.
+   * `overflow-x: auto` wrappers often prevent fragmentation unless forced visible here.
+   */
+  .print-split-table-wrap {
+    overflow: visible !important;
+  }
+
+  table.print-split-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  table.print-split-table thead {
+    display: table-header-group;
+  }
+
+  table.print-split-table tbody {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  /* Keep each data row on one page; allow breaks after a row. */
+  table.print-split-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
 
 .print-only {
