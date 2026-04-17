@@ -57,6 +57,28 @@ export interface FormState {
   monteCarloTrials: number
   /** Integer seed for reproducible Monte Carlo; empty string uses an automatic seed each run. */
   monteCarloSeed: string
+  /**
+   * Share of total retirement savings by account type (whole percents). Four buckets must sum to 100.
+   * Used for future MAGI-aware modeling.
+   */
+  portfolioTaxDeferredPercent: number
+  portfolioRothPercent: number
+  portfolioTaxablePercent: number
+  portfolioHsaPercent: number
+  /**
+   * Estimated share of each dollar withdrawn from taxable accounts that counts toward MAGI
+   * (e.g. realized gains, ordinary dividends), whole percent 0–100. Illustrative proxy only.
+   */
+  taxableWithdrawalMagiPercent: number
+  /**
+   * People in the tax household for Marketplace / Form 8962 context (not necessarily same as
+   * “has spouse” in the portfolio model). Used only for healthcare education on this tab.
+   */
+  acaMarketplaceHouseholdSize: number
+  /**
+   * Estimated annual household MAGI for subsidy context; null means not entered. Not used by simulation.
+   */
+  acaMarketplaceMagiEstimate: number | null
 }
 
 export function defaultFormState(nowYear: number): FormState {
@@ -92,6 +114,13 @@ export function defaultFormState(nowYear: number): FormState {
     projectionMode: 'deterministic',
     monteCarloTrials: 500,
     monteCarloSeed: '',
+    portfolioTaxDeferredPercent: 45,
+    portfolioRothPercent: 15,
+    portfolioTaxablePercent: 35,
+    portfolioHsaPercent: 5,
+    taxableWithdrawalMagiPercent: 40,
+    acaMarketplaceHouseholdSize: 2,
+    acaMarketplaceMagiEstimate: null,
   }
 }
 
@@ -119,6 +148,70 @@ export function validateMonteCarloControls(form: FormState): ValidationIssue[] {
     })
   }
 
+  return issues
+}
+
+/** Whole percents for tax-deferred / Roth / taxable / HSA must total 100; taxable MAGI share 0–100. */
+export function validatePortfolioAccountMix(form: FormState): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  const buckets = [
+    form.portfolioTaxDeferredPercent,
+    form.portfolioRothPercent,
+    form.portfolioTaxablePercent,
+    form.portfolioHsaPercent,
+  ]
+  for (const b of buckets) {
+    if (!Number.isFinite(b) || b < 0 || b > 100) {
+      issues.push({
+        field: 'portfolioAccountMix',
+        message: 'Each account bucket must be between 0% and 100%.',
+      })
+      break
+    }
+  }
+  const sum =
+    form.portfolioTaxDeferredPercent +
+    form.portfolioRothPercent +
+    form.portfolioTaxablePercent +
+    form.portfolioHsaPercent
+  if (Number.isFinite(sum) && Math.abs(sum - 100) > 0.01) {
+    issues.push({
+      field: 'portfolioAccountMix',
+      message: 'Tax-deferred, Roth, taxable, and HSA portions must total 100%.',
+    })
+  }
+  if (
+    !Number.isFinite(form.taxableWithdrawalMagiPercent) ||
+    form.taxableWithdrawalMagiPercent < 0 ||
+    form.taxableWithdrawalMagiPercent > 100
+  ) {
+    issues.push({
+      field: 'taxableWithdrawalMagiPercent',
+      message: 'Taxable withdrawal MAGI share should be between 0% and 100%.',
+    })
+  }
+  return issues
+}
+
+/** Marketplace household size and optional MAGI estimate (healthcare tab only; not used by simulation). */
+export function validateAcaMarketplacePlanner(form: FormState): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  const s = form.acaMarketplaceHouseholdSize
+  if (!Number.isFinite(s) || !Number.isInteger(s) || s < 1 || s > 20) {
+    issues.push({
+      field: 'acaMarketplaceHouseholdSize',
+      message: 'Marketplace household size should be a whole number from 1 to 20.',
+    })
+  }
+  const m = form.acaMarketplaceMagiEstimate
+  if (m !== null) {
+    if (!Number.isFinite(m) || m < 0) {
+      issues.push({
+        field: 'acaMarketplaceMagiEstimate',
+        message: 'Estimated MAGI should be zero or greater (or leave blank).',
+      })
+    }
+  }
   return issues
 }
 

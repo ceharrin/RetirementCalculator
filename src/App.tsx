@@ -24,6 +24,8 @@ import {
   defaultFormState,
   formStateToSimulationInput,
   validateMonteCarloControls,
+  validatePortfolioAccountMix,
+  validateAcaMarketplacePlanner,
   type FormState,
 } from './types/form'
 
@@ -138,7 +140,12 @@ export default function App() {
 
   const simulationInput = useMemo(() => formStateToSimulationInput(form), [form])
   const validationIssues = useMemo(
-    () => [...validateSimulationInput(simulationInput), ...validateMonteCarloControls(form)],
+    () => [
+      ...validateSimulationInput(simulationInput),
+      ...validateMonteCarloControls(form),
+      ...validatePortfolioAccountMix(form),
+      ...validateAcaMarketplacePlanner(form),
+    ],
     [simulationInput, form],
   )
   const canRun = validationIssues.length === 0
@@ -164,6 +171,18 @@ export default function App() {
       )
     }
   }, [canRun, form, simulationInput])
+
+  /** Same as `runProjection`, then scroll results into view (for Healthcare tab action). */
+  const runProjectionFromHealthcareTab = useCallback(() => {
+    if (!canRun) return
+    runProjection()
+    requestAnimationFrame(() => {
+      document.getElementById('projection-results')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }, [canRun, runProjection])
 
   const printOrSavePdf = useCallback(() => {
     if (!deterministicResult && !monteCarloResult) return
@@ -210,6 +229,8 @@ export default function App() {
                 form.projectionMode === 'deterministic' ? deterministicResult?.rows : undefined
               }
               guardrailExampleYears={form.useSpendingGuardrails ? guardrailExampleYears : []}
+              canRunProjection={canRun}
+              onRunProjectionFromHealthcareTab={runProjectionFromHealthcareTab}
             />
             <div className="mt-6">
               <button
@@ -228,7 +249,10 @@ export default function App() {
             </div>
           </div>
 
-          <div className="lg:col-span-3 print:w-full print:max-w-none">
+          <div
+            id="projection-results"
+            className="scroll-mt-6 lg:col-span-3 print:w-full print:max-w-none"
+          >
             {hasAnyResult ? (
               <div className="flex flex-col gap-8 print:gap-6">
                 <div className="print-only mb-4 border-b border-slate-300 pb-3">

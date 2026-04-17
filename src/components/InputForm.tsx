@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { FormState } from '../types/form'
+import { HealthcareFormTab } from './HealthcareFormTab'
 import type { ValidationIssue } from '../lib/simulateRetirement'
 import { parseMoneyInputToDollars } from '../lib/parseMoneyInput'
 import {
@@ -41,6 +42,9 @@ interface InputFormProps {
   validationIssues: ValidationIssue[]
   projectionRows?: YearProjection[]
   guardrailExampleYears?: number[]
+  /** Enables Run projection on the Healthcare tab (same run as the button below the form). */
+  canRunProjection?: boolean
+  onRunProjectionFromHealthcareTab?: () => void
 }
 
 function fieldError(issues: ValidationIssue[], field: string): string | undefined {
@@ -244,6 +248,8 @@ export function InputForm({
   validationIssues,
   projectionRows,
   guardrailExampleYears,
+  canRunProjection = false,
+  onRunProjectionFromHealthcareTab,
 }: InputFormProps) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ [key]: value } as Patch<K>)
@@ -298,11 +304,59 @@ export function InputForm({
     )
   }, [form.useSpendingGuardrails, guardrailExampleYears, projectionRows])
 
+  const [activeInputTab, setActiveInputTab] = useState<'assumptions' | 'healthcare'>('assumptions')
+
   return (
     <form className="text-left" onSubmit={(e) => e.preventDefault()}>
       <article className="overflow-hidden rounded-xl border border-indigo-200/70 bg-white shadow-md shadow-indigo-100/30 dark:border-indigo-800/50 dark:bg-slate-900 dark:shadow-indigo-950/20">
+        <div
+          className="flex gap-1 border-b border-indigo-200/60 bg-gradient-to-r from-indigo-50/95 to-violet-50/90 px-2 py-2 dark:border-indigo-800/50 dark:from-indigo-950/60 dark:to-violet-950/50"
+          role="tablist"
+          aria-label="Assumptions sections"
+        >
+          <button
+            type="button"
+            role="tab"
+            id="tab-input-assumptions"
+            aria-selected={activeInputTab === 'assumptions'}
+            aria-controls="input-assumptions-panel"
+            tabIndex={activeInputTab === 'assumptions' ? 0 : -1}
+            onClick={() => setActiveInputTab('assumptions')}
+            className={`min-h-9 flex-1 rounded-md px-3 py-2 text-xs font-bold transition-colors sm:text-sm ${
+              activeInputTab === 'assumptions'
+                ? 'bg-white text-indigo-900 shadow-sm dark:bg-indigo-900/80 dark:text-indigo-50'
+                : 'text-indigo-800 hover:bg-white/60 dark:text-indigo-200 dark:hover:bg-indigo-900/40'
+            }`}
+          >
+            Assumptions
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-input-healthcare"
+            aria-selected={activeInputTab === 'healthcare'}
+            aria-controls="input-healthcare-panel"
+            tabIndex={activeInputTab === 'healthcare' ? 0 : -1}
+            onClick={() => setActiveInputTab('healthcare')}
+            className={`min-h-9 flex-1 rounded-md px-3 py-2 text-xs font-bold transition-colors sm:text-sm ${
+              activeInputTab === 'healthcare'
+                ? 'bg-white text-indigo-900 shadow-sm dark:bg-indigo-900/80 dark:text-indigo-50'
+                : 'text-indigo-800 hover:bg-white/60 dark:text-indigo-200 dark:hover:bg-indigo-900/40'
+            }`}
+          >
+            Healthcare
+          </button>
+        </div>
+
+        <div
+          id="input-assumptions-panel"
+          role="tabpanel"
+          aria-labelledby="tab-input-assumptions"
+          hidden={activeInputTab !== 'assumptions'}
+          className={activeInputTab !== 'assumptions' ? 'hidden' : undefined}
+        >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200/60 bg-gradient-to-r from-indigo-50/95 to-violet-50/90 px-3 py-2.5 dark:border-indigo-800/50 dark:from-indigo-950/60 dark:to-violet-950/50">
-          <h2 className="text-base font-bold text-indigo-900 dark:text-indigo-100">Assumptions</h2>
+          <h2 className="text-base font-bold text-indigo-900 dark:text-indigo-100">Planning</h2>
           <button
             type="button"
             onClick={() => {
@@ -1061,6 +1115,23 @@ export function InputForm({
             </div>
           </section>
         ) : null}
+        </div>
+
+        <div
+          id="input-healthcare-panel"
+          role="tabpanel"
+          aria-labelledby="tab-input-healthcare"
+          hidden={activeInputTab !== 'healthcare'}
+          className={activeInputTab !== 'healthcare' ? 'hidden' : undefined}
+        >
+          <HealthcareFormTab
+            form={form}
+            onChange={onChange}
+            validationIssues={validationIssues}
+            canRunProjection={canRunProjection}
+            onRunProjection={onRunProjectionFromHealthcareTab}
+          />
+        </div>
       </article>
     </form>
   )

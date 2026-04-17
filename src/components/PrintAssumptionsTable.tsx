@@ -125,6 +125,34 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
     ),
   )
 
+  rows.push(sectionHeader('Healthcare (MAGI prep)'))
+  rows.push(
+    assumptionRow('Tax-deferred % (IRA, 401(k), etc.)', formatPercentWhole(form.portfolioTaxDeferredPercent)),
+  )
+  rows.push(assumptionRow('Roth %', formatPercentWhole(form.portfolioRothPercent)))
+  rows.push(assumptionRow('Taxable brokerage %', formatPercentWhole(form.portfolioTaxablePercent)))
+  rows.push(assumptionRow('HSA %', formatPercentWhole(form.portfolioHsaPercent)))
+  rows.push(
+    assumptionRow(
+      'Taxable withdrawal MAGI share',
+      formatPercentWhole(form.taxableWithdrawalMagiPercent),
+    ),
+  )
+  rows.push(
+    assumptionRow(
+      'Marketplace household size (MAGI / FPL helper)',
+      String(form.acaMarketplaceHouseholdSize),
+    ),
+  )
+  rows.push(
+    assumptionRow(
+      'Estimated annual MAGI (subsidy context)',
+      form.acaMarketplaceMagiEstimate === null
+        ? 'Not entered'
+        : formatMoney(form.acaMarketplaceMagiEstimate),
+    ),
+  )
+
   rows.push(sectionHeader('Social Security'))
   rows.push(
     assumptionRow(
