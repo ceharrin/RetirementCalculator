@@ -7,6 +7,7 @@ import { MonteCarloPlanOutcomeGraphic } from './components/MonteCarloPlanOutcome
 import { MonteCarloResultsTable } from './components/MonteCarloResultsTable'
 import { PrintAssumptionsTable } from './components/PrintAssumptionsTable'
 import { ResultsTable } from './components/ResultsTable'
+import { SsClaimAgeComparisonPanel } from './components/SsClaimAgeComparisonPanel'
 import { runMonteCarloBootstrap, type MonteCarloResult } from './lib/monteCarloBootstrap'
 import {
   clampSsClaimAge,
@@ -328,6 +329,17 @@ export default function App() {
                     <MonteCarloBalanceChart rows={monteCarloResult.rows} />
                   </section>
                 ) : null}
+                <div className="print:order-2">
+                  <SsClaimAgeComparisonPanel
+                    retireeAnnualSS={form.retireeAnnualSS}
+                    retireeCurrentAge={form.retireeCurrentAge}
+                    retireeDeathAge={form.retireeDeathAge}
+                    spouseAnnualSS={form.hasSpouse ? form.spouseAnnualSS : null}
+                    spouseCurrentAge={form.hasSpouse ? form.spouseCurrentAge : null}
+                    spouseDeathAge={form.hasSpouse ? form.spouseDeathAge : null}
+                    colaRate={form.socialSecurityColaPercent / 100}
+                  />
+                </div>
                 {hasDeterministicView ? (
                   <section className="print:order-3">
                     <h2 className="mb-3 text-lg font-bold text-indigo-950 dark:text-indigo-100 print:text-slate-900">

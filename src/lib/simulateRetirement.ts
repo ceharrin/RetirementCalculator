@@ -92,10 +92,8 @@ export interface SimulationInput {
   spouseClaimAge: number | null
   retireeAnnualSS: number
   spouseAnnualSS: number | null
-  /** Optional additional nominal household income received each year after start age. */
-  otherAnnualIncome: number
-  /** Retiree age when other annual income starts. */
-  otherIncomeStartAge: number
+  /** Recurring nominal income streams (pension, rental, part-time, etc.) beyond Social Security. */
+  recurringIncomes: RecurringIncomeInput[]
   /** One-time contributions added to portfolio in the matching retiree age year. */
   windfalls: WindfallInput[]
   /** One-time portfolio-funded expenses charged in the matching retiree age year. */
@@ -176,6 +174,14 @@ export interface OneTimeExpenseInput {
   title: string
   amount: number
   startAge: number
+}
+
+export interface RecurringIncomeInput {
+  label: string
+  annualAmount: number
+  startAge: number
+  /** Last retiree age this income is received. null = runs through the last alive year. */
+  endAge: number | null
 }
 
 function lastAliveYear(
@@ -340,8 +346,11 @@ function computeOtherAnnualIncome(
   input: SimulationInput,
 ): number {
   if (!(retireeAlive || spouseAlive)) return 0
-  if (retireeAge < input.otherIncomeStartAge) return 0
-  return input.otherAnnualIncome
+  return input.recurringIncomes.reduce((sum, s) => {
+    if (retireeAge < s.startAge) return sum
+    if (s.endAge !== null && retireeAge > s.endAge) return sum
+    return sum + s.annualAmount
+  }, 0)
 }
 
 function computeWindfallForYear(
@@ -587,15 +596,16 @@ export function validateSimulationInput(
     issues.push({ field: 'socialSecurity', message: 'Social Security amounts cannot be negative.' })
   }
 
-  if (input.otherAnnualIncome < 0) {
-    issues.push({ field: 'otherAnnualIncome', message: 'Other annual income cannot be negative.' })
-  }
-
-  if (input.otherIncomeStartAge < 18 || input.otherIncomeStartAge > 120) {
-    issues.push({
-      field: 'otherIncomeStartAge',
-      message: 'Other income start age should be between 18 and 120.',
-    })
+  for (const [i, s] of input.recurringIncomes.entries()) {
+    if (s.annualAmount < 0) {
+      issues.push({ field: `recurringIncome_${i}_amount`, message: `Income stream "${s.label || i + 1}" amount cannot be negative.` })
+    }
+    if (s.startAge < 18 || s.startAge > 120) {
+      issues.push({ field: `recurringIncome_${i}_startAge`, message: `Income stream "${s.label || i + 1}" start age must be between 18 and 120.` })
+    }
+    if (s.endAge !== null && (s.endAge < s.startAge || s.endAge > 120)) {
+      issues.push({ field: `recurringIncome_${i}_endAge`, message: `Income stream "${s.label || i + 1}" end age must be at or after start age.` })
+    }
   }
 
   input.windfalls.forEach((w, idx) => {

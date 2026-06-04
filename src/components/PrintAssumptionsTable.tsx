@@ -15,7 +15,7 @@ function formatPercentWhole(n: number): string {
 
 function sectionHeader(label: string) {
   return (
-    <tr key={label}>
+    <tr key={`section::${label}`}>
       <th
         colSpan={2}
         scope="colgroup"
@@ -29,7 +29,7 @@ function sectionHeader(label: string) {
 
 function assumptionRow(label: string, value: string) {
   return (
-    <tr key={label} className="border-b border-slate-200">
+    <tr key={`row::${label}`} className="border-b border-slate-200">
       <td className="px-2 py-1.5 text-left text-sm text-slate-700">{label}</td>
       <td className="px-2 py-1.5 text-right text-sm font-medium tabular-nums text-slate-900">
         {value}
@@ -169,8 +169,16 @@ export function PrintAssumptionsTable(props: { form: FormState }) {
     rows.push(assumptionRow('Spouse claim age', String(form.spouseClaimAge)))
     rows.push(assumptionRow('Spouse annual benefit', formatMoney(form.spouseAnnualSS)))
   }
-  rows.push(assumptionRow('Other annual income', formatMoney(form.otherAnnualIncome)))
-  rows.push(assumptionRow('Other income starts (retiree age)', String(form.otherIncomeStartAge)))
+  rows.push(sectionHeader('Recurring income'))
+  if (form.recurringIncomes.length === 0) {
+    rows.push(assumptionRow('Recurring income streams', 'None'))
+  } else {
+    form.recurringIncomes.forEach((s, idx) => {
+      const label = s.label.trim().length > 0 ? s.label : `Income ${idx + 1}`
+      const endStr = s.endAge !== null ? `– age ${s.endAge}` : 'ongoing'
+      rows.push(assumptionRow(label, `${formatMoney(s.annualAmount)}, age ${s.startAge} ${endStr}`))
+    })
+  }
 
   rows.push(sectionHeader('Windfalls'))
   if (form.windfalls.length === 0) {

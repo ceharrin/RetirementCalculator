@@ -7,11 +7,13 @@ import {
   type SimulationInput,
   type SurvivorSSMode,
   type OneTimeExpenseInput,
+  type RecurringIncomeInput,
   type WindfallInput,
   type ValidationIssue,
 } from '../lib/simulateRetirement'
 
 export type ProjectionMode = 'deterministic' | 'monte_carlo'
+export type { RecurringIncomeInput }
 
 /** Form-friendly mirror of simulation input; rates as whole percents (e.g. 3 = 3%). */
 export interface FormState {
@@ -34,8 +36,7 @@ export interface FormState {
   spouseClaimAge: number
   retireeAnnualSS: number
   spouseAnnualSS: number
-  otherAnnualIncome: number
-  otherIncomeStartAge: number
+  recurringIncomes: RecurringIncomeInput[]
   windfalls: WindfallInput[]
   oneTimeExpenses: OneTimeExpenseInput[]
   /** Annual SS COLA as whole percent (e.g. 2.6 = 2.6%). */
@@ -100,8 +101,7 @@ export function defaultFormState(nowYear: number): FormState {
     spouseClaimAge: 67,
     retireeAnnualSS: 30_000,
     spouseAnnualSS: 22_000,
-    otherAnnualIncome: 0,
-    otherIncomeStartAge: 67,
+    recurringIncomes: [],
     windfalls: [],
     oneTimeExpenses: [],
     socialSecurityColaPercent: DEFAULT_SS_COLA_RATE * 100,
@@ -234,8 +234,7 @@ export function formStateToSimulationInput(form: FormState): SimulationInput {
     spouseClaimAge: form.hasSpouse ? clampSsClaimAge(form.spouseClaimAge) : null,
     retireeAnnualSS: form.retireeAnnualSS,
     spouseAnnualSS: form.hasSpouse ? form.spouseAnnualSS : null,
-    otherAnnualIncome: form.otherAnnualIncome,
-    otherIncomeStartAge: form.otherIncomeStartAge,
+    recurringIncomes: form.recurringIncomes,
     windfalls: form.windfalls,
     oneTimeExpenses: form.oneTimeExpenses,
     socialSecurityColaRate: form.socialSecurityColaPercent / 100,

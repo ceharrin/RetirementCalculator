@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { FormState } from '../types/form'
+import type { FormState, RecurringIncomeInput } from '../types/form'
 import { HealthcareFormTab } from './HealthcareFormTab'
 import type { ValidationIssue } from '../lib/simulateRetirement'
 import { parseMoneyInputToDollars } from '../lib/parseMoneyInput'
@@ -253,6 +253,26 @@ export function InputForm({
 }: InputFormProps) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ [key]: value } as Patch<K>)
+  const addRecurringIncome = () =>
+    set('recurringIncomes', [
+      ...form.recurringIncomes,
+      {
+        label: `Income ${form.recurringIncomes.length + 1}`,
+        annualAmount: 0,
+        startAge: form.retireeRetirementAge,
+        endAge: null,
+      } satisfies RecurringIncomeInput,
+    ])
+  const updateRecurringIncome = (idx: number, patch: Partial<RecurringIncomeInput>) =>
+    set(
+      'recurringIncomes',
+      form.recurringIncomes.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    )
+  const removeRecurringIncome = (idx: number) =>
+    set(
+      'recurringIncomes',
+      form.recurringIncomes.filter((_, i) => i !== idx),
+    )
   const addWindfall = () =>
     set('windfalls', [
       ...form.windfalls,
@@ -725,9 +745,9 @@ export function InputForm({
                             width={54}
                           />
                           <Tooltip
-                            formatter={(value: number, name: string) => [
+                            formatter={(value: unknown, name: unknown) => [
                               formatMoney(typeof value === 'number' ? value : Number(value)),
-                              name,
+                              String(name),
                             ]}
                             wrapperStyle={{ zIndex: 30 }}
                             contentStyle={{
@@ -832,30 +852,118 @@ export function InputForm({
         </section>
 
         <section className="border-b border-indigo-100/90 px-3 py-2.5 dark:border-indigo-900/40">
-          <div className="mb-1.5">
-            <h3 className={sectionTitle}>Other Income</h3>
+          <div className="mb-0.5 flex items-center justify-between gap-2">
+            <h3 className={sectionTitle}>Recurring income</h3>
+            <button
+              type="button"
+              onClick={addRecurringIncome}
+              className="rounded-md border border-indigo-300/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
+            >
+              Add income stream
+            </button>
           </div>
-          <div className="mb-2 grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
-            <MoneyField
-              id="otherAnnualIncome"
-              label="Other annual income ($)"
-              value={form.otherAnnualIncome}
-              onChange={(n) => set('otherAnnualIncome', n)}
-              min={0}
-              error={fieldError(validationIssues, 'otherAnnualIncome')}
-              hint="Additional household income beyond Social Security."
-            />
-            <NumField
-              id="otherIncomeStartAge"
-              label="Other income starts (retiree age)"
-              value={form.otherIncomeStartAge}
-              onChange={(n) => set('otherIncomeStartAge', n)}
-              min={18}
-              max={120}
-              error={fieldError(validationIssues, 'otherIncomeStartAge')}
-              hint="If earlier than current age, income starts immediately."
-            />
-          </div>
+          <p className="mb-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            Pension, rental income, part-time work, annuity, or any other recurring income beyond Social Security.
+          </p>
+          {form.recurringIncomes.length === 0 ? (
+            <p className="mb-1.5 text-[11px] text-slate-500 dark:text-slate-400">No recurring income streams added.</p>
+          ) : (
+            <div className="mb-2 space-y-1.5">
+              {form.recurringIncomes.map((s, idx) => (
+                <div
+                  key={`recurring-income-${idx}`}
+                  className="rounded-md border border-indigo-100/80 p-1.5 dark:border-indigo-800/50"
+                >
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-12 sm:items-end">
+                    <div className="sm:col-span-4">
+                      <label
+                        htmlFor={`recurring-income-label-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Label
+                      </label>
+                      <input
+                        id={`recurring-income-label-${idx}`}
+                        type="text"
+                        value={s.label}
+                        onChange={(e) => updateRecurringIncome(idx, { label: e.target.value })}
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label
+                        htmlFor={`recurring-income-amount-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Annual amount ($)
+                      </label>
+                      <input
+                        id={`recurring-income-amount-${idx}`}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInteger(s.annualAmount)}
+                        onChange={(e) =>
+                          updateRecurringIncome(idx, {
+                            annualAmount: clampInteger(parseMoneyInputToDollars(e.target.value), 0),
+                          })
+                        }
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor={`recurring-income-start-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        Start age
+                      </label>
+                      <input
+                        id={`recurring-income-start-${idx}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={18}
+                        max={120}
+                        value={s.startAge}
+                        onChange={(e) => updateRecurringIncome(idx, { startAge: Number(e.target.value) })}
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label
+                        htmlFor={`recurring-income-end-${idx}`}
+                        className="mb-0.5 block text-[11px] font-semibold text-slate-800 dark:text-slate-200"
+                      >
+                        End age <span className="font-normal text-slate-400">(blank = forever)</span>
+                      </label>
+                      <input
+                        id={`recurring-income-end-${idx}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={s.startAge}
+                        max={120}
+                        value={s.endAge ?? ''}
+                        placeholder="—"
+                        onChange={(e) => {
+                          const v = e.target.value.trim()
+                          updateRecurringIncome(idx, { endAge: v === '' ? null : Number(v) })
+                        }}
+                        className="box-border min-h-9 w-full min-w-0 rounded-md border border-indigo-200/90 bg-white px-2.5 py-1.5 text-right text-sm tabular-nums text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/35 dark:border-indigo-700/70 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="sm:col-span-1">
+                      <button
+                        type="button"
+                        onClick={() => removeRecurringIncome(idx)}
+                        className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mb-0.5 flex items-center justify-between gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
               Windfalls
@@ -946,7 +1054,7 @@ export function InputForm({
                         onClick={() => removeWindfall(idx)}
                         className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
                       >
-                        Remove
+                        ✕
                       </button>
                     </div>
                   </div>
@@ -1049,7 +1157,7 @@ export function InputForm({
                         onClick={() => removeOneTimeExpense(idx)}
                         className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-red-300/80 bg-white px-3 py-1.5 text-center text-xs font-medium leading-none text-red-700 hover:bg-red-50 dark:border-red-700/70 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/30"
                       >
-                        Remove
+                        ✕
                       </button>
                     </div>
                   </div>
